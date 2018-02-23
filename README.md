@@ -17,8 +17,8 @@ selecting the window with the kinect data we can:
 
 
  
-<img src = "https://github.com/carlosfva1990/Kinectv2_pcl_freenect2_SegmentDifferences/blob/master/Kinect.PNG" width = 80>
-<img src = "https://github.com/carlosfva1990/Kinectv2_pcl_freenect2_SegmentDifferences/blob/master/filtro.PNG" width = 80>
+<img src = "https://github.com/carlosfva1990/Kinectv2_pcl_freenect2_SegmentDifferences/blob/master/Kinect.PNG" width = 200>
+<img src = "https://github.com/carlosfva1990/Kinectv2_pcl_freenect2_SegmentDifferences/blob/master/filtro.PNG" width = 150>
 if you want the original grabber project the link is:
  
 https://github.com/giacomodabisias/libfreenect2pclgrabber
