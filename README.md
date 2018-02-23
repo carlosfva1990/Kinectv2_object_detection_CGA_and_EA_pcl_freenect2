@@ -2,7 +2,23 @@
 
 this is an example project where using the sensor kinect v2 the point cloud is represented using  pcl 1.8,
 and for grabbing the data is a libfreenect2 grabber.
+
+in this program display four windows, one is the comand line output, one the kinect data as Point cloud, other thar is the copy data
+to filter and one las window showing the filered point cloud.
+
+the copy data is used to substract the points that are similar, and leaves what its diferent **`filter=cloud1-cloud2`**
+
+selecting the window with the kinect data we can:
+* using the `"p"` key makes a copy of the current data
+* using the `"s"` key save the point cloud to a ply file
+* using the `"r"` and `"d"` change the value of the treshold distance filter
+* using the `"t"` and `"f"` change the value to down sample the point cloud
+
+
+
  
+<img src = "https://github.com/carlosfva1990/Kinectv2_pcl_freenect2_SegmentDifferences/blob/master/Kinect.PNG" width = 80>
+<img src = "https://github.com/carlosfva1990/Kinectv2_pcl_freenect2_SegmentDifferences/blob/master/filtro.PNG" width = 80>
 if you want the original grabber project the link is:
  
 https://github.com/giacomodabisias/libfreenect2pclgrabber
