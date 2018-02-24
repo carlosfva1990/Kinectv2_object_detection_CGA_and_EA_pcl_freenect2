@@ -21,25 +21,21 @@ via Luigi Alamanni 13D, San Giuliano Terme 56010 (PI), Italy
 #include <chrono>
 #include <pcl/segmentation/segment_differences.h>
 #include <pcl/filters/voxel_grid.h>
-// extra headers for writing out ply file
 #include <pcl/console/print.h>
 #include <pcl/console/parse.h>
 #include <pcl/console/time.h>
 #include <pcl/io/ply_io.h>
-#ifdef WITH_SERIALIZATION
-#include "serialization.h"
-#endif
 
 typedef pcl::PointXYZRGB PointType;
 
-boost::shared_ptr<pcl::PointCloud<PointType>> cloud;
-pcl::PointCloud<PointType>::Ptr cloud4(new pcl::PointCloud<PointType>);
-pcl::PointCloud<PointType>::Ptr cloud3(new pcl::PointCloud<PointType>);
-pcl::PointCloud<PointType>::Ptr cloud2(new pcl::PointCloud<PointType>);
+boost::shared_ptr<pcl::PointCloud<PointType>> cloudKinect;
+pcl::PointCloud<PointType>::Ptr cloudAux(new pcl::PointCloud<PointType>);
+pcl::PointCloud<PointType>::Ptr cloudCopy(new pcl::PointCloud<PointType>);
+pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>);
 
 int PrimeraVez = 0;
 double tress = 0.01;
-double down = 0.005;
+double down = 0.05;
 
 struct PlySaver{
 
@@ -74,47 +70,29 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
 	if(pressed == "p")
 	{
 		//se guarda una imagen inicial en cloud2 para luego compararla
-		pcl::copyPointCloud(*cloud3, *cloud2);
+		pcl::copyPointCloud(*cloudAux, *cloudCopy);
 		std::cout << "cpiado" << std::endl;
 	}
-	if (pressed == "m")
-	{
-		s->k2g_.mirror();
-		std::cout << "mirror " << std::endl;
-	}
-	if (pressed == "r")
+	if (pressed == "o")
 	{
 		tress = tress + 0.001;
 		std::cout << "tres " << tress << std::endl;
 	}
-	if (pressed == "d")
+	if (pressed == "l")
 	{
 		tress = tress - 0.001;
 		std::cout << "tres " << tress << std::endl;
 	}
-	if (pressed == "t")
+	if (pressed == "i")
 	{
 		down = down + 0.001;
 		std::cout << "down " << down << std::endl;
 	}
-	if (pressed == "f")
+	if (pressed == "k")
 	{
 		down = down - 0.001;
 		std::cout << "down " << down << std::endl;
 	}
-#ifdef WITH_SERIALIZATION
-    if(pressed == "z")
-    {
-      if(!(s->k2g_.serialize_status())){
-        std::cout << "serialization enabled" << std::endl;
-        s->k2g_.enableSerialization();
-      }
-      else{
-        std::cout << "serialization disabled" << std::endl;
-        s->k2g_.disableSerialization();
-      }
-    }
-#endif
     if(pressed == "x")
     {
         s->k2g_.storeParameters();
@@ -128,104 +106,68 @@ int main(int argc, char * argv[])
   std::cout << "Syntax is: " << argv[0] << " [-processor 0|1|2] -processor options 0,1,2,3 correspond to CPU, OPENCL, OPENGL, CUDA respectively\n";
   std::cout << "Press \'s\' to store a cloud" << std::endl;
   std::cout << "Press \'x\' to store the calibrations." << std::endl;
-#ifdef WITH_SERIALIZATION
-  std::cout << "Press \'z\' to start/stop serialization." << std::endl;
-#endif
+
   Processor freenectprocessor = CPU;
   std::vector<int> ply_file_indices;
-
-  if(argc > 1){
-      freenectprocessor = static_cast<Processor>(atoi(argv[1]));
-  }
-
-
   K2G k2g(freenectprocessor);
   std::cout << "getting cloud" << std::endl;
-  cloud = k2g.getCloud();
+  cloudKinect = k2g.getCloud();
 
   k2g.printParameters();
 
-  cloud->sensor_orientation_.w() = 0.0;
-  cloud->sensor_orientation_.x() = 1.0;
-  cloud->sensor_orientation_.y() = 0.0;
-  cloud->sensor_orientation_.z() = 0.0;
+  cloudAux->sensor_orientation_.w() = 0.0;
+  cloudAux->sensor_orientation_.x() = 1.0;
+  cloudAux->sensor_orientation_.y() = 0.0;
+  cloudAux->sensor_orientation_.z() = 0.0;
 
-  cloud2->sensor_orientation_.x() = 1.0;
-  cloud2->sensor_orientation_.y() = 0.0;
-  cloud2->sensor_orientation_.z() = 0.0;
-  cloud2->sensor_orientation_.w() = 0.0;
-
-  cloud4->sensor_orientation_.w() = 0.0;
-  cloud4->sensor_orientation_.x() = 1.0;
-  cloud4->sensor_orientation_.y() = 0.0;
-  cloud4->sensor_orientation_.z() = 0.0;
+  cloudOut->sensor_orientation_.w() = 0.0;
+  cloudOut->sensor_orientation_.x() = 1.0;
+  cloudOut->sensor_orientation_.y() = 0.0;
+  cloudOut->sensor_orientation_.z() = 0.0;
 
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
-  viewer->setBackgroundColor(0, 0, 0);
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer2(new pcl::visualization::PCLVisualizer("3D Viewer"));
-  viewer2->setBackgroundColor(0, 0, 0);
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer3(new pcl::visualization::PCLVisualizer("3D Viewer"));
-  viewer3->setBackgroundColor(0, 0, 0);
 
-
-  pcl::visualization::PointCloudColorHandlerRGBField<PointType> rgb(cloud);
-  viewer->addPointCloud<PointType>(cloud, rgb, "sample cloud");
+  int v1(0);
+  viewer->createViewPort(0.0, 0.0, 0.5, 1.0, v1);
+  viewer->setBackgroundColor(0, 0, 0, v1);
+  viewer->addText("Kinect data input",10,10, "v1 text", v1);
+  pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(cloudAux);
+  viewer->addPointCloud<PointType>(cloudAux, rgb, "sample cloud", v1);
   viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "sample cloud");
+  int v2(0);
+  viewer->createViewPort(0.5, 0.0, 1.0, 1.0, v2);
+  viewer->setBackgroundColor(0.1, 0.1, 0.1, v2);
+  viewer->addText("Filtered data",10,10, "v2 text", v2);
+  viewer->addPointCloud<pcl::PointXYZRGB>(cloudOut, "sample cloud2", v2);
+
 
 
   pcl::SegmentDifferences<PointType> resta;
   // Downsample to voxel grid
   pcl::VoxelGrid<PointType> vg;
 
-  PlySaver ps(cloud, false, false, k2g);
+  PlySaver ps(cloudKinect, false, false, k2g);
   viewer->registerKeyboardCallback(KeyboardEventOccurred, (void*)&ps);
 
   cv::Mat color, depth;
-
-
-
+  
   while(!viewer->wasStopped()){
 
-	  viewer->spinOnce();
-	  viewer2->spinOnce();
-	  viewer3->spinOnce();
-    //std::chrono::high_resolution_clock::time_point tnow = std::chrono::high_resolution_clock::now();
+	viewer->spinOnce();
+	k2g.get(color, depth, cloudKinect);
+	vg.setInputCloud(cloudKinect);
 
-    k2g.get(color, depth, cloud);
-    // Showing only color since depth is float and needs conversion
-    //cv::imshow("color", color);
-    //int c = cv::waitKey(1);
-    
-    //std::chrono::high_resolution_clock::time_point tpost = std::chrono::high_resolution_clock::now();
-    //std::cout << "delta " << std::chrono::duration_cast<std::chrono::duration<double>>(tpost-tnow).count() * 1000 << std::endl;
-	
-	vg.setInputCloud(cloud);
-	//vg.setLeafSize(0.01f, 0.01f, 0.01f);
 	vg.setLeafSize(down, down, down);
-	vg.filter(*cloud3);
+	vg.filter(*cloudAux);
 	
-
-	//pcl::copyPointCloud(*cloud, *cloud3);
-
-		resta.setInputCloud(cloud3);
-		resta.setTargetCloud(cloud2);
-		resta.setDistanceThreshold(tress);
-		//epcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-		//pcl::getPointCloudDifference(cloud3, cloud2, tress, kdtree, *cloud3);
-		//kdt->nearestKSearch;
-		resta.segment(*cloud4);
+	resta.setInputCloud(cloudAux);
+	resta.setTargetCloud(cloudCopy);
+	resta.setDistanceThreshold(tress);
+	resta.segment(*cloudOut);
 	
-
-	
-    pcl::visualization::PointCloudColorHandlerRGBField<PointType> rgb(cloud);
-	viewer->updatePointCloud<PointType>(cloud, rgb, "sample cloud");
-	
-	if (!viewer2->updatePointCloud(cloud2, "copia")) {
-		viewer2->addPointCloud(cloud2, "copia");
-	}
-	if (!viewer3->updatePointCloud(cloud4, "Filtros")) {
-		viewer3->addPointCloud(cloud4, "Filtros");
-	}
+    pcl::visualization::PointCloudColorHandlerRGBField<PointType> rgb(cloudAux);
+	viewer->updatePointCloud<PointType>(cloudAux, rgb, "sample cloud");
+	viewer->updatePointCloud(cloudOut, "sample cloud2");
   }
   k2g.shutDown();
   return 0;
