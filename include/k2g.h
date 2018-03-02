@@ -91,10 +91,10 @@ public:
 			case OPENGL:
 				std::cout << "creating OpenGL processor" << std::endl;
 				if (serial.empty())
-				/*	dev_ = freenect2_.openDefaultDevice (new libfreenect2::OpenGLPacketPipeline ());
+					dev_ = freenect2_.openDefaultDevice (new libfreenect2::OpenGLPacketPipeline ());
 				else
 					dev_ = freenect2_.openDevice (serial, new libfreenect2::OpenGLPacketPipeline ());
-				*/break;
+				break;
 #ifdef WITH_CUDA
 			case CUDA:
 				std::cout << "creating Cuda processor" << std::endl;

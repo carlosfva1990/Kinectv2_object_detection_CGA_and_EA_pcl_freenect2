@@ -30,12 +30,16 @@ typedef pcl::PointXYZRGB PointType;
 
 boost::shared_ptr<pcl::PointCloud<PointType>> cloudKinect;
 pcl::PointCloud<PointType>::Ptr cloudAux(new pcl::PointCloud<PointType>);
+pcl::PointCloud<PointType>::Ptr cloudAux2(new pcl::PointCloud<PointType>);
 pcl::PointCloud<PointType>::Ptr cloudCopy(new pcl::PointCloud<PointType>);
 pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>);
 
 int PrimeraVez = 0;
 double tress = 0.01;
-double down = 0.05;
+double down = 0.025;
+bool _downSample = true;
+bool _resta = true;
+bool _ciclo = true;
 
 struct PlySaver{
 
@@ -70,25 +74,48 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
 	if(pressed == "p")
 	{
 		//se guarda una imagen inicial en cloud2 para luego compararla
-		pcl::copyPointCloud(*cloudAux, *cloudCopy);
+		pcl::copyPointCloud(*cloudAux2, *cloudCopy);
 		std::cout << "cpiado" << std::endl;
 	}
 	if (pressed == "o")
+	{ 
+		//sirbe para debugear y ver que ocurre en cada ciclo
+		//hay que descomentar una linea en main que hace _ciclo = false
+		_ciclo = true;
+		std::cout << "ciclo" << std::endl;
+	}
+	if (pressed == "u")
+	{
+		if (_resta)
+			_resta = false;
+		else
+			_resta = true;
+		std::cout << "resta " << _resta << std::endl;
+	}
+	if (pressed == "j")
 	{
 		tress = tress + 0.001;
 		std::cout << "tres " << tress << std::endl;
 	}
-	if (pressed == "l")
+	if (pressed == "m")
 	{
 		tress = tress - 0.001;
 		std::cout << "tres " << tress << std::endl;
 	}
-	if (pressed == "i")
+	if (pressed == "y")
+	{
+		if (_downSample)
+			_downSample = false;
+		else
+			_downSample = true;
+		std::cout << "downSample " << _downSample << std::endl;
+	}
+	if (pressed == "h")
 	{
 		down = down + 0.001;
 		std::cout << "down " << down << std::endl;
 	}
-	if (pressed == "k")
+	if (pressed == "n")
 	{
 		down = down - 0.001;
 		std::cout << "down " << down << std::endl;
@@ -103,16 +130,15 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
 
 int main(int argc, char * argv[])
 {
-  std::cout << "Syntax is: " << argv[0] << " [-processor 0|1|2] -processor options 0,1,2,3 correspond to CPU, OPENCL, OPENGL, CUDA respectively\n";
   std::cout << "Press \'s\' to store a cloud" << std::endl;
   std::cout << "Press \'x\' to store the calibrations." << std::endl;
 
-  Processor freenectprocessor = CPU;
+  //se define e inicia la captura de datos de kinect usando freenect y k2g
+  Processor freenectprocessor = OPENGL;
   std::vector<int> ply_file_indices;
   K2G k2g(freenectprocessor);
   std::cout << "getting cloud" << std::endl;
   cloudKinect = k2g.getCloud();
-
   k2g.printParameters();
 
   cloudAux->sensor_orientation_.w() = 0.0;
@@ -125,50 +151,89 @@ int main(int argc, char * argv[])
   cloudOut->sensor_orientation_.y() = 0.0;
   cloudOut->sensor_orientation_.z() = 0.0;
 
+  //se crea una ventana y se vincula con el objeto viewer 
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
 
+  //se divide la ventana en 2 para mostrar la entrada y la salida
+  //para el lado izq
   int v1(0);
   viewer->createViewPort(0.0, 0.0, 0.5, 1.0, v1);
   viewer->setBackgroundColor(0, 0, 0, v1);
   viewer->addText("Kinect data input",10,10, "v1 text", v1);
-  pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(cloudAux);
-  viewer->addPointCloud<PointType>(cloudAux, rgb, "sample cloud", v1);
+  viewer->addPointCloud<PointType>(cloudAux, "sample cloud", v1);
   viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "sample cloud");
+  //para el lado der
   int v2(0);
   viewer->createViewPort(0.5, 0.0, 1.0, 1.0, v2);
   viewer->setBackgroundColor(0.1, 0.1, 0.1, v2);
   viewer->addText("Filtered data",10,10, "v2 text", v2);
-  viewer->addPointCloud<pcl::PointXYZRGB>(cloudOut, "sample cloud2", v2);
+  viewer->addPointCloud<PointType>(cloudOut, "sample cloud2", v2);
 
-
-
-  pcl::SegmentDifferences<PointType> resta;
-  // Downsample to voxel grid
+  // para usar menos puntos de la nuve
   pcl::VoxelGrid<PointType> vg;
 
-  PlySaver ps(cloudKinect, false, false, k2g);
+  // para realizar la dferencia entre 2 nuves de puntos
+  pcl::SegmentDifferences<PointType> resta;
+
+  //se agrega un evento para el teclado para poder guardar la nuve
+  PlySaver ps(cloudAux2, false, false, k2g);
   viewer->registerKeyboardCallback(KeyboardEventOccurred, (void*)&ps);
 
+  //mat de cv2 obtiene las imagenes del kinect
   cv::Mat color, depth;
   
+  //para reducir la cantidad de puntos
+  vg.setInputCloud(cloudAux);
+  vg.setLeafSize(down, down, down);
+
+
+  //para eliminar los puntos que no se usan
+  resta.setInputCloud(cloudAux2);
+  resta.setTargetCloud(cloudCopy);
+  resta.setDistanceThreshold(tress);
+
+  //inicia el ciclo con los datos ya iniciados
   while(!viewer->wasStopped()){
 
-	viewer->spinOnce();
-	k2g.get(color, depth, cloudKinect);
-	vg.setInputCloud(cloudKinect);
+	  if (_ciclo)
+	  {
+		  //limpia la ventana delos datos anteriores
+		  viewer->spinOnce();
 
-	vg.setLeafSize(down, down, down);
-	vg.filter(*cloudAux);
-	
-	resta.setInputCloud(cloudAux);
-	resta.setTargetCloud(cloudCopy);
-	resta.setDistanceThreshold(tress);
-	resta.segment(*cloudOut);
-	
-    pcl::visualization::PointCloudColorHandlerRGBField<PointType> rgb(cloudAux);
-	viewer->updatePointCloud<PointType>(cloudAux, rgb, "sample cloud");
-	viewer->updatePointCloud(cloudOut, "sample cloud2");
+		  //se obtienen los datos del kinect
+		  k2g.get(color, depth, cloudKinect);
+
+		  copyPointCloud(*cloudKinect, *cloudAux);
+
+		  if (_downSample)
+		  {
+			  //se reducen la cantidad de puntos
+			  vg.setLeafSize(down, down, down);
+			  vg.filter(*cloudAux2);
+		  }
+		  else
+		  {
+			  copyPointCloud(*cloudAux, *cloudAux2);
+		  }
+
+		  if (_resta)
+		  {
+			  //se eliminan los puntos que no se usan
+			  resta.segment(*cloudOut);
+		  }
+		  else
+		  {
+			  copyPointCloud(*cloudAux2, *cloudOut);
+		  }
+
+		  //se envian los datos de las nuves de puntos y mostrarlos en la ventana
+		  viewer->updatePointCloud<PointType>(cloudAux, "sample cloud");
+		  viewer->updatePointCloud(cloudOut, "sample cloud2");
+
+		  //_ciclo = false;
+	  }
   }
+
   k2g.shutDown();
   return 0;
 }
