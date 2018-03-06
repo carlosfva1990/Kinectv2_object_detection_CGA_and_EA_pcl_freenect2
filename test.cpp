@@ -25,6 +25,13 @@ via Luigi Alamanni 13D, San Giuliano Terme 56010 (PI), Italy
 #include <pcl/console/parse.h>
 #include <pcl/console/time.h>
 #include <pcl/io/ply_io.h>
+#include <pcl/kdtree/kdtree.h>
+#include <pcl/segmentation/extract_clusters.h>
+#include <pcl/sample_consensus/ransac.h>
+#include <pcl/sample_consensus/sac_model_plane.h>
+#include <pcl/sample_consensus/sac_model_sphere.h>
+
+#include <pcl/filters/extract_indices.h>
 
 typedef pcl::PointXYZRGB PointType;
 
@@ -34,12 +41,18 @@ pcl::PointCloud<PointType>::Ptr cloudAux2(new pcl::PointCloud<PointType>);
 pcl::PointCloud<PointType>::Ptr cloudCopy(new pcl::PointCloud<PointType>);
 pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>);
 
+// Creating the KdTree object for the search method of the extraction
+pcl::search::KdTree<PointType>::Ptr tree(new pcl::search::KdTree<PointType>);
+std::vector<pcl::PointIndices> cluster_indices;
+
 int PrimeraVez = 0;
 double tress = 0.01;
 double down = 0.025;
 bool _downSample = true;
 bool _resta = true;
 bool _ciclo = true;
+bool _ciclo2 = false;
+bool _cluster = false;
 
 struct PlySaver{
 
@@ -75,13 +88,28 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
 	{
 		//se guarda una imagen inicial en cloud2 para luego compararla
 		pcl::copyPointCloud(*cloudAux2, *cloudCopy);
+		tree->setInputCloud(cloudOut);
+		_cluster = true;
 		std::cout << "cpiado" << std::endl;
 	}
 	if (pressed == "o")
-	{ 
+	{
+		//sirbe para debugear y ver que ocurre en cada ciclo
+		//hay que descomentar una linea en main que hace _ciclo = false
+		if (_ciclo)
+			_ciclo = false;
+		else
+			_ciclo = true;
+
+		std::cout << "ciclo" << std::endl;
+	}
+	if (pressed == "l")
+	{
 		//sirbe para debugear y ver que ocurre en cada ciclo
 		//hay que descomentar una linea en main que hace _ciclo = false
 		_ciclo = true;
+		_ciclo2 = true;
+
 		std::cout << "ciclo" << std::endl;
 	}
 	if (pressed == "u")
@@ -128,6 +156,12 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
   }
 }
 
+
+void PreProsessing(pcl::visualization::PCLVisualizer& viewer)
+{
+
+}
+
 int main(int argc, char * argv[])
 {
   std::cout << "Press \'s\' to store a cloud" << std::endl;
@@ -137,6 +171,7 @@ int main(int argc, char * argv[])
   Processor freenectprocessor = OPENGL;
   std::vector<int> ply_file_indices;
   K2G k2g(freenectprocessor);
+
   std::cout << "getting cloud" << std::endl;
   cloudKinect = k2g.getCloud();
   k2g.printParameters();
@@ -153,31 +188,47 @@ int main(int argc, char * argv[])
 
   //se crea una ventana y se vincula con el objeto viewer 
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer2(new pcl::visualization::PCLVisualizer("3D Viewer"));
 
   //se divide la ventana en 2 para mostrar la entrada y la salida
   //para el lado izq
   int v1(0);
+  viewer2->setBackgroundColor(0, 0, 0);
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10);
+
+
   viewer->createViewPort(0.0, 0.0, 0.5, 1.0, v1);
   viewer->setBackgroundColor(0, 0, 0, v1);
-  viewer->addText("Kinect data input",10,10, "v1 text", v1);
+  viewer->addText("Kinect data input", 10, 10, "v1 text", v1);
+  viewer->addText("s: save cloud to ply", 10, 180, "v1 text2", v1);
+  viewer->addText("p: copy to filter", 10, 170, "v1 text3", v1);
+  viewer->addText("u: on/off filter", 10, 160, "v1 text4", v1);
+  viewer->addText("j: increase threshold filter", 10, 150, "v1 text5", v1);
+  viewer->addText("m: reduce  threshold filter", 10, 140, "v1 text6", v1);
+  viewer->addText("y: on/off douwn sample", 10, 130, "v1 text7", v1);
+  viewer->addText("h: increase threshold douwn sample", 10, 120, "v1 text8", v1);
+  viewer->addText("n: reduce  threshold douwn sample", 10, 110, "v1 text9", v1);
+  viewer->addText("o: pausa la ejecucion del programa", 10, 100, "v1 text10", v1);
+  viewer->addText("l: ejecuta un ciclo del programa y se pausa", 10, 90, "v1 text11", v1);
   viewer->addPointCloud<PointType>(cloudAux, "sample cloud", v1);
-  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "sample cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5);
   //para el lado der
   int v2(0);
   viewer->createViewPort(0.5, 0.0, 1.0, 1.0, v2);
   viewer->setBackgroundColor(0.1, 0.1, 0.1, v2);
-  viewer->addText("Filtered data",10,10, "v2 text", v2);
+  viewer->addText("Filtered data",10,10, "v2 text", v2); 
   viewer->addPointCloud<PointType>(cloudOut, "sample cloud2", v2);
+
+  //se agrega un evento para el teclado para poder guardar la nuve
+  PlySaver ps(cloudAux2, false, false, k2g);
+  viewer->registerKeyboardCallback(KeyboardEventOccurred, (void*)&ps);
+  viewer2->registerKeyboardCallback(KeyboardEventOccurred, (void*)&ps);
 
   // para usar menos puntos de la nuve
   pcl::VoxelGrid<PointType> vg;
 
   // para realizar la dferencia entre 2 nuves de puntos
   pcl::SegmentDifferences<PointType> resta;
-
-  //se agrega un evento para el teclado para poder guardar la nuve
-  PlySaver ps(cloudAux2, false, false, k2g);
-  viewer->registerKeyboardCallback(KeyboardEventOccurred, (void*)&ps);
 
   //mat de cv2 obtiene las imagenes del kinect
   cv::Mat color, depth;
@@ -187,28 +238,42 @@ int main(int argc, char * argv[])
   vg.setLeafSize(down, down, down);
 
 
-  //para eliminar los puntos que no se usan
+  //para eliminar los puntos que no se usan (filtro kalman)
   resta.setInputCloud(cloudAux2);
   resta.setTargetCloud(cloudCopy);
   resta.setDistanceThreshold(tress);
 
-  //inicia el ciclo con los datos ya iniciados
-  while(!viewer->wasStopped()){
+  //clusterizacion de objetos usando la distancia euclidiana
+  pcl::EuclideanClusterExtraction<PointType> ec;
+  ec.setClusterTolerance(down); 
+  ec.setMinClusterSize(50);
+  ec.setMaxClusterSize(25000);
+  ec.setSearchMethod(tree);
+  ec.setInputCloud(cloudOut);
+  ec.extract(cluster_indices);
 
+
+  //inicia el ciclo con los datos ya iniciados
+  while(!viewer->wasStopped()|| !viewer2->wasStopped()){
+
+	  //permite la visualozacion de los datos en las ventanas
+	  viewer->spinOnce();
+	  viewer2->spinOnce(); 
+
+	  //pausa la ejecucion
 	  if (_ciclo)
 	  {
-		  //limpia la ventana delos datos anteriores
-		  viewer->spinOnce();
 
 		  //se obtienen los datos del kinect
 		  k2g.get(color, depth, cloudKinect);
-
+		  //se copian a una nube auxiliar
 		  copyPointCloud(*cloudKinect, *cloudAux);
 
 		  if (_downSample)
 		  {
 			  //se reducen la cantidad de puntos
 			  vg.setLeafSize(down, down, down);
+			  ec.setClusterTolerance(down+0.01); //la toleracia para el cluster es poco mas grande que la de la reduccion 
 			  vg.filter(*cloudAux2);
 		  }
 		  else
@@ -226,11 +291,64 @@ int main(int argc, char * argv[])
 			  copyPointCloud(*cloudAux2, *cloudOut);
 		  }
 
-		  //se envian los datos de las nuves de puntos y mostrarlos en la ventana
-		  viewer->updatePointCloud<PointType>(cloudAux, "sample cloud");
-		  viewer->updatePointCloud(cloudOut, "sample cloud2");
+		  if (_cluster)
+		  {
+			  //se obtienen los fiferentes objetos en diferentes nuves de puntos
+			  int j = 0;//contador de clusters
+			  std::cout << "cluster" << std::endl;
+			  std::vector<pcl::PointIndices> cluster_indices;//hay que reiniciarlos indices
+			  ec.extract(cluster_indices);
+			  //para cada nube de puntos(objetos) encontrada:
+			  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
+			  {
+				  pcl::PointCloud<PointType>::Ptr cloud_cluster(new pcl::PointCloud<PointType>);
+				  pcl::PointCloud<PointType>::Ptr cloud_cluster2(new pcl::PointCloud<PointType>);
+				  //copia cada punto descrito por los inices
+				  for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
+					  cloud_cluster->points.push_back(cloudOut->points[*pit]); 
 
-		  //_ciclo = false;
+				  cloud_cluster->width = cloud_cluster->points.size();
+				  cloud_cluster->height = 1;
+				  cloud_cluster->is_dense = true;
+
+
+				  std::vector<int> inliers;//indice de pintos que pertenecen a la figura
+
+				  // created RandomSampleConsensus object and compute the appropriated model
+				  pcl::SampleConsensusModelSphere<PointType>::Ptr model_s(new pcl::SampleConsensusModelSphere<PointType>(cloud_cluster));
+				  pcl::RandomSampleConsensus<PointType> ransac(model_s);
+				  ransac.setDistanceThreshold(.01);//tolerancia de error en la figura
+				  ransac.computeModel();
+				  ransac.getInliers(inliers);
+
+				  //se copian solo los puntos de la figura(esfera, plano o cilindro) a otra nube de puntos
+				  pcl::copyPointCloud<PointType>(*cloud_cluster, inliers, *cloud_cluster2);
+
+				  cloud_cluster2->sensor_orientation_.w() = 0.0;
+				  cloud_cluster2->sensor_orientation_.x() = 1.0;
+				  cloud_cluster2->sensor_orientation_.y() = 0.0;
+				  cloud_cluster2->sensor_orientation_.z() = 0.0;
+
+				  //se agreega la nube resultante a la ventana para la visualizasion
+				  if (! viewer2->updatePointCloud(cloud_cluster2, "cloud" + std::to_string(j)))
+				  {
+					  viewer2->addPointCloud<PointType>(cloud_cluster2, "cloud" + std::to_string(j));
+					  std::cout << "cluster" + std::to_string(j) << std::endl;
+				  }
+				  
+				  j++;
+			  }
+		  }
+
+
+		  //se envian los datos de las nuves de puntos y mostrarlos en la ventana
+		  viewer->updatePointCloud(cloudOut, "sample cloud2");
+		  viewer->updatePointCloud<PointType>(cloudAux, "sample cloud");
+		 // boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
+
+		  //si se usa la tecla de ciclo unico
+		  if(_ciclo2)
+			_ciclo = false;
 	  }
   }
 

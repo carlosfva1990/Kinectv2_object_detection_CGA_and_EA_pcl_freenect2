@@ -11,6 +11,8 @@ the copy data is used to substract the points that are similar, and leaves what 
 selecting the window with the kinect data we can:
 * using the `"p"` key makes a copy of the current data
 * using the `"s"` key save the point cloud to a ply file
+* using the `"o"` key pause the program
+* using the `"l"` key execute one loop of the program
 * using the `"u"` to activate or deactivate the filter
 * using the `"j"` and `"m"` change the value of the treshold distance filter
 * using the `"y"` to activate or deactivate the down sample the point cloud
