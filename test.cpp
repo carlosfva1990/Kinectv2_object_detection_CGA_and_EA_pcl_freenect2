@@ -30,29 +30,40 @@ via Luigi Alamanni 13D, San Giuliano Terme 56010 (PI), Italy
 #include <pcl/sample_consensus/ransac.h>
 #include <pcl/sample_consensus/sac_model_plane.h>
 #include <pcl/sample_consensus/sac_model_sphere.h>
+#include <pcl/sample_consensus/sac_model_cylinder.h>
+#include <pcl/features/normal_3d.h>
 
 #include <pcl/filters/extract_indices.h>
 
 typedef pcl::PointXYZRGB PointType;
+typedef pcl::Normal PointNType;
 
 boost::shared_ptr<pcl::PointCloud<PointType>> cloudKinect;
 pcl::PointCloud<PointType>::Ptr cloudAux(new pcl::PointCloud<PointType>);
 pcl::PointCloud<PointType>::Ptr cloudAux2(new pcl::PointCloud<PointType>);
 pcl::PointCloud<PointType>::Ptr cloudCopy(new pcl::PointCloud<PointType>);
 pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>);
+pcl::NormalEstimation<PointType, PointNType > ne;
 
 // Creating the KdTree object for the search method of the extraction
 pcl::search::KdTree<PointType>::Ptr tree(new pcl::search::KdTree<PointType>);
 std::vector<pcl::PointIndices> cluster_indices;
 
-int PrimeraVez = 0;
 double tress = 0.01;
 double down = 0.025;
+double probSphere = 0;
+double probPlane = 0;
+double probCylinder = 0;
 bool _downSample = true;
 bool _resta = true;
+bool _cluster = false;
 bool _ciclo = true;
 bool _ciclo2 = false;
-bool _cluster = false;
+
+
+bool _sphere = false;
+bool _plane = false;
+bool _cylinder = false;
 
 struct PlySaver{
 
@@ -64,6 +75,7 @@ struct PlySaver{
   bool binary_;
   bool use_camera_;
   K2G & k2g_;
+
 };
 
 //entrada por teclado
@@ -157,24 +169,21 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
 }
 
 
-void PreProsessing(pcl::visualization::PCLVisualizer& viewer)
-{
-
-}
 
 int main(int argc, char * argv[])
 {
-  std::cout << "Press \'s\' to store a cloud" << std::endl;
-  std::cout << "Press \'x\' to store the calibrations." << std::endl;
 
   //se define e inicia la captura de datos de kinect usando freenect y k2g
   Processor freenectprocessor = OPENGL;
   std::vector<int> ply_file_indices;
   K2G k2g(freenectprocessor);
+  k2g.disableLog();
+  
+ 
 
   std::cout << "getting cloud" << std::endl;
   cloudKinect = k2g.getCloud();
-  k2g.printParameters();
+  //k2g.printParameters();
 
   cloudAux->sensor_orientation_.w() = 0.0;
   cloudAux->sensor_orientation_.x() = 1.0;
@@ -187,13 +196,15 @@ int main(int argc, char * argv[])
   cloudOut->sensor_orientation_.z() = 0.0;
 
   //se crea una ventana y se vincula con el objeto viewer 
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer2(new pcl::visualization::PCLVisualizer("3D Viewer"));
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Data Kinect"));
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer2(new pcl::visualization::PCLVisualizer("fig"));
 
   //se divide la ventana en 2 para mostrar la entrada y la salida
   //para el lado izq
   int v1(0);
   viewer2->setBackgroundColor(0, 0, 0);
+  viewer->setPosition(350, 50);
+  viewer2->setPosition(1240, 60);
   viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10);
 
 
@@ -254,7 +265,7 @@ int main(int argc, char * argv[])
 
 
   //inicia el ciclo con los datos ya iniciados
-  while(!viewer->wasStopped()|| !viewer2->wasStopped()){
+  while(!viewer->wasStopped() && !viewer2->wasStopped()){
 
 	  //permite la visualozacion de los datos en las ventanas
 	  viewer->spinOnce();
@@ -265,7 +276,8 @@ int main(int argc, char * argv[])
 	  {
 
 		  //se obtienen los datos del kinect
-		  k2g.get(color, depth, cloudKinect);
+		  k2g.updateCloud(cloudKinect);
+		  //k2g.get(color, depth, cloudKinect);
 		  //se copian a una nube auxiliar
 		  copyPointCloud(*cloudKinect, *cloudAux);
 
@@ -293,6 +305,9 @@ int main(int argc, char * argv[])
 
 		  if (_cluster)
 		  {
+			  viewer2->removeAllPointClouds();
+			  viewer2->removeAllShapes();
+			  viewer2->addCoordinateSystem(1);
 			  //se obtienen los fiferentes objetos en diferentes nuves de puntos
 			  int j = 0;//contador de clusters
 			  std::cout << "cluster" << std::endl;
@@ -303,6 +318,9 @@ int main(int argc, char * argv[])
 			  {
 				  pcl::PointCloud<PointType>::Ptr cloud_cluster(new pcl::PointCloud<PointType>);
 				  pcl::PointCloud<PointType>::Ptr cloud_cluster2(new pcl::PointCloud<PointType>);
+				  pcl::PointCloud<PointNType>::Ptr cloud_normals(new pcl::PointCloud<PointNType>);
+
+
 				  //copia cada punto descrito por los inices
 				  for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
 					  cloud_cluster->points.push_back(cloudOut->points[*pit]); 
@@ -311,32 +329,126 @@ int main(int argc, char * argv[])
 				  cloud_cluster->height = 1;
 				  cloud_cluster->is_dense = true;
 
-
 				  std::vector<int> inliers;//indice de pintos que pertenecen a la figura
 
-				  // created RandomSampleConsensus object and compute the appropriated model
+
+				  // se calcula RANSAC para la esfera
 				  pcl::SampleConsensusModelSphere<PointType>::Ptr model_s(new pcl::SampleConsensusModelSphere<PointType>(cloud_cluster));
-				  pcl::RandomSampleConsensus<PointType> ransac(model_s);
-				  ransac.setDistanceThreshold(.01);//tolerancia de error en la figura
-				  ransac.computeModel();
-				  ransac.getInliers(inliers);
+				  model_s->setRadiusLimits(0.05, 0.5);
+				  pcl::RandomSampleConsensus<PointType> ransacS(model_s);
+				  ransacS.setDistanceThreshold(.01);//tolerancia de error en la figura
+				  ransacS.computeModel();
+				  ransacS.getInliers(inliers);
+				  probSphere = (double)inliers.size()/ cloud_cluster->width;
+
+				  // se calcula RANSAC para el plano 
+				  pcl::SampleConsensusModelPlane<PointType>::Ptr model_p(new pcl::SampleConsensusModelPlane<PointType>(cloud_cluster));
+				  pcl::RandomSampleConsensus<PointType> ransacP(model_p);
+				  ransacP.setDistanceThreshold(.01);//tolerancia de error en la figura
+				  ransacP.computeModel();
+				  ransacP.getInliers(inliers);
+				  probPlane = (double)inliers.size()/ cloud_cluster->width;
+
+				  
+				  // se calcula RANSAC para el cilindro 
+				  pcl::SampleConsensusModelCylinder<PointType, PointNType >::Ptr model_c(new pcl::SampleConsensusModelCylinder<PointType, PointNType >(cloud_cluster));
+				  //model_c =pcl::SampleConsensusModelCylinder<PointType, pcl::PointXYZRGBNormal>(cloud_cluster);
+				  ne.setSearchMethod(tree);
+				  ne.setInputCloud(cloud_cluster);
+				  ne.setKSearch(50);
+				  ne.compute(*cloud_normals);
+				  model_c->setInputNormals(cloud_normals);
+				  model_c->setInputCloud(cloud_cluster);
+				  model_c->setRadiusLimits(0.02, 1);
+				  pcl::RandomSampleConsensus<PointType> ransacC(model_c);
+				  ransacC.setDistanceThreshold(.01);//tolerancia de error en la figura
+				  ransacC.computeModel();
+				  ransacC.getInliers(inliers);
+				  probCylinder = (double)inliers.size() / cloud_cluster->width;
+
+
+
+				  //se muestran las probabilidades para cada objeto
+				  std::cout << "sphere prob "<< probSphere << std::endl;
+				  std::cout << "plane prob " << probPlane << std::endl;
+				  std::cout << "cylinder prob " << probCylinder << std::endl;
+
+				  //se elige la mejor probabilidad
+				  if (probSphere > probCylinder && probSphere > probPlane)
+					  _sphere = true;
+				  if (probCylinder > probPlane && probCylinder > probSphere)
+					  _cylinder = true;
+				  if (probPlane > probCylinder && probPlane > probSphere)
+					  _plane = true;
+
+
+				  if (_sphere)
+				  {
+					  ransacS.getInliers(inliers);
+					  //se obtienen los datos de la figura y se convirten en un tipo de dato para graficar
+					  Eigen::VectorXf coefficients;
+					  ransacS.getModelCoefficients(coefficients);
+					  pcl::PointXYZ center;
+					  center.x = coefficients[0];
+					  center.y = coefficients[1];
+					  center.z = coefficients[2];
+					  //se crea una esfera que correspunde al modelo calculado y se muestra
+					  viewer2->addSphere(center, coefficients[3], 0.5, 0.0, 0.0, "sphere" + std::to_string(j));
+
+					  std::cout << "sphere" + std::to_string(j) << std::endl;
+					  _sphere = false;
+
+				  }
+				  if (_plane)
+				  {
+
+					  ransacP.getInliers(inliers);//calcula los puntos de la fugura
+					  //se obtienen los datos de la figura y se convirten en un tipo de dato para graficar
+					  pcl::ModelCoefficients coefficientsM;
+					  Eigen::VectorXf coefficients;
+					  coefficientsM.values.resize(4);
+					  ransacP.getModelCoefficients(coefficients);
+					  pcl::PointXYZ center;
+					  coefficientsM.values[0] = coefficients[0];//centro x
+					  coefficientsM.values[1] = coefficients[1];//centro y
+					  coefficientsM.values[2] = coefficients[2];//centro z
+					  coefficientsM.values[3] = coefficients[3];//radio
+					  //se crea un plano que correspunde al modelo calculado y se muestra
+					  viewer2->addPlane(coefficientsM, "plane" + std::to_string(j));
+
+					  std::cout << "plane" + std::to_string(j) << std::endl;
+					  _plane = false;
+				  }
+				  if (_cylinder)
+				  {
+
+					  ransacC.getInliers(inliers);
+					  //se obtienen los datos de la figura y se convirten en un tipo de dato para graficar
+					  pcl::ModelCoefficients coefficientsM;
+					  Eigen::VectorXf coefficients;
+					  coefficientsM.values.resize(7);
+					  ransacC.getModelCoefficients(coefficients);
+					  pcl::PointXYZ center;
+					  coefficientsM.values[0] = coefficients[0];// centro x
+					  coefficientsM.values[1] = coefficients[1];// centro y
+					  coefficientsM.values[2] = coefficients[2];// centro z
+					  coefficientsM.values[3] = coefficients[3];// direccion del eje x
+					  coefficientsM.values[4] = coefficients[4];// direccion del eje y 
+					  coefficientsM.values[5] = coefficients[5];// direccion del eje z
+					  coefficientsM.values[6] = coefficients[6];// radio
+					  viewer2->addCylinder(coefficientsM, "cylinder" + std::to_string(j));
+
+					  std::cout << "cylinder" + std::to_string(j) << std::endl;
+					  _cylinder = false;
+				  }
 
 				  //se copian solo los puntos de la figura(esfera, plano o cilindro) a otra nube de puntos
 				  pcl::copyPointCloud<PointType>(*cloud_cluster, inliers, *cloud_cluster2);
-
-				  cloud_cluster2->sensor_orientation_.w() = 0.0;
-				  cloud_cluster2->sensor_orientation_.x() = 1.0;
-				  cloud_cluster2->sensor_orientation_.y() = 0.0;
-				  cloud_cluster2->sensor_orientation_.z() = 0.0;
-
 				  //se agreega la nube resultante a la ventana para la visualizasion
-				  if (! viewer2->updatePointCloud(cloud_cluster2, "cloud" + std::to_string(j)))
-				  {
-					  viewer2->addPointCloud<PointType>(cloud_cluster2, "cloud" + std::to_string(j));
-					  std::cout << "cluster" + std::to_string(j) << std::endl;
-				  }
-				  
+				  viewer2->addPointCloud<PointType>(cloud_cluster2, "cloud" + std::to_string(j));
+				  //se sima uno al contador de cluster
 				  j++;
+				  std::cout << "cluster" + std::to_string(j) << std::endl;
 			  }
 		  }
 
