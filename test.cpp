@@ -38,22 +38,10 @@ via Luigi Alamanni 13D, San Giuliano Terme 56010 (PI), Italy
 typedef pcl::PointXYZRGB PointType;
 typedef pcl::Normal PointNType;
 
-boost::shared_ptr<pcl::PointCloud<PointType>> cloudKinect;
-pcl::PointCloud<PointType>::Ptr cloudAux(new pcl::PointCloud<PointType>);
-pcl::PointCloud<PointType>::Ptr cloudAux2(new pcl::PointCloud<PointType>);
-pcl::PointCloud<PointType>::Ptr cloudCopy(new pcl::PointCloud<PointType>);
-pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>);
-pcl::NormalEstimation<PointType, PointNType > ne;
 
-// Creating the KdTree object for the search method of the extraction
-pcl::search::KdTree<PointType>::Ptr tree(new pcl::search::KdTree<PointType>);
-std::vector<pcl::PointIndices> cluster_indices;
 
 double tress = 0.01;
 double down = 0.025;
-double probSphere = 0;
-double probPlane = 0;
-double probCylinder = 0;
 bool _downSample = true;
 bool _resta = true;
 bool _cluster = false;
@@ -61,9 +49,16 @@ bool _ciclo = true;
 bool _ciclo2 = false;
 
 
-bool _sphere = false;
-bool _plane = false;
-bool _cylinder = false;
+boost::shared_ptr<pcl::PointCloud<PointType>> cloudKinect;
+pcl::PointCloud<PointType>::Ptr cloudAux(new pcl::PointCloud<PointType>);
+pcl::PointCloud<PointType>::Ptr cloudAux2(new pcl::PointCloud<PointType>);
+pcl::PointCloud<PointType>::Ptr cloudCopy(new pcl::PointCloud<PointType>);
+pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>);
+pcl::NormalEstimation<PointType, PointNType > ne;
+// Creating the KdTree object for the search method of the extraction
+pcl::search::KdTree<PointType>::Ptr tree(new pcl::search::KdTree<PointType>);
+std::vector<pcl::PointIndices> cluster_indices;
+
 
 struct PlySaver{
 
@@ -172,9 +167,8 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
 
 int main(int argc, char * argv[])
 {
-
   //se define e inicia la captura de datos de kinect usando freenect y k2g
-  Processor freenectprocessor = OPENGL;
+  Processor freenectprocessor = CUDA;//si no tienes cuda instalado prueba con OPENGL o CPU
   std::vector<int> ply_file_indices;
   K2G k2g(freenectprocessor);
   k2g.disableLog();
@@ -303,8 +297,16 @@ int main(int argc, char * argv[])
 			  copyPointCloud(*cloudAux2, *cloudOut);
 		  }
 
-		  if (_cluster)
+		  if (_cluster && _resta)
 		  {
+			  double probSphere = 0;
+			  double probPlane = 0;
+			  double probCylinder = 0;
+
+			  bool _sphere = false;
+			  bool _plane = false;
+			  bool _cylinder = false;
+
 			  viewer2->removeAllPointClouds();
 			  viewer2->removeAllShapes();
 			  viewer2->addCoordinateSystem(1);
