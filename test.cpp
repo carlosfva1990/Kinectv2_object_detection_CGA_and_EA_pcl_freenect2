@@ -130,17 +130,7 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
 		else
 			_resta = true;
 		std::cout << "substract " << _resta << std::endl;
-	}/*
-	if (pressed == "j")
-	{
-		tress = tress + 0.001;
-		std::cout << "tres " << tress << std::endl;
 	}
-	if (pressed == "m")
-	{
-		tress = tress - 0.001;
-		std::cout << "tres " << tress << std::endl;
-	}*/
 	if (pressed == "d")
 	{
 		if (_downSample)
@@ -148,22 +138,7 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
 		else
 			_downSample = true;
 		std::cout << "downSample " << _downSample << std::endl;
-	}/*
-	if (pressed == "h")
-	{
-		down = down + 0.001;
-		std::cout << "down " << down << std::endl;
 	}
-	if (pressed == "n")
-	{
-		down = down - 0.001;
-		std::cout << "down " << down << std::endl;
-	}
-    if(pressed == "x")
-    {
-        s->k2g_.storeParameters();
-        std::cout << "stored calibration parameters" << std::endl;
-    }*/
   }
 }
 
@@ -212,19 +187,6 @@ int main(int argc, char * argv[])
 	std::vector<int> ply_file_indices;
 	K2G k2g(freenectprocessor);
 	k2g.disableLog();
-
-	/*
-	//estos parametros son para que la camara se aline en el ligar de la nube
-	cloudAux->sensor_orientation_.w() = 0.0;
-	cloudAux->sensor_orientation_.x() = 1.0;
-	cloudAux->sensor_orientation_.y() = 0.0;
-	cloudAux->sensor_orientation_.z() = 0.0;
-
-	cloudOut->sensor_orientation_.w() = 0.0;
-	cloudOut->sensor_orientation_.x() = 1.0;
-	cloudOut->sensor_orientation_.y() = 0.0;
-	cloudOut->sensor_orientation_.z() = 0.0;
-	*/
 
 
 
@@ -459,7 +421,6 @@ int main(int argc, char * argv[])
 			//se envian los datos de las nuves de puntos y mostrarlos en la ventana
 			viewer->updatePointCloud(cloudOut, "sample cloud2");
 			viewer->updatePointCloud<PointType>(cloudAux, "sample cloud");
-			// boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
 
 			t1 = clock();
 			double time = (double(t1 - t0) / CLOCKS_PER_SEC);
