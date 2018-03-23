@@ -353,17 +353,17 @@ int main(int argc, char * argv[])
 
   viewer->createViewPort(0.0, 0.0, 0.5, 1.0, v1);
   viewer->setBackgroundColor(0, 0, 0, v1);
-  viewer->addText("Kinect data input", 10, 10, "v1 text", v1);
-  viewer->addText("s: save cloud to ply", 10, 180, "v1 text2", v1);
-  viewer->addText("p: copy to filter", 10, 170, "v1 text3", v1);
-  viewer->addText("u: on/off filter", 10, 160, "v1 text4", v1);
-  viewer->addText("j: increase threshold filter", 10, 150, "v1 text5", v1);
-  viewer->addText("m: reduce  threshold filter", 10, 140, "v1 text6", v1);
-  viewer->addText("y: on/off douwn sample", 10, 130, "v1 text7", v1);
-  viewer->addText("h: increase threshold douwn sample", 10, 120, "v1 text8", v1);
-  viewer->addText("n: reduce  threshold douwn sample", 10, 110, "v1 text9", v1);
-  viewer->addText("o: pausa la ejecucion del programa", 10, 100, "v1 text10", v1);
-  viewer->addText("l: ejecuta un ciclo del programa y se pausa", 10, 90, "v1 text11", v1);
+  viewer2->addText("Kinect data input", 10, 10, "v1 text");
+  viewer2->addText("s: save cloud to ply", 10, 180, "v1 text2");
+  viewer2->addText("p: copy to filter", 10, 170, "v1 text3");
+  viewer2->addText("u: on/off filter", 10, 160, "v1 text4");
+  viewer2->addText("j: increase threshold filter", 10, 150, "v1 text5");
+  viewer2->addText("m: reduce  threshold filter", 10, 140, "v1 text6");
+  viewer2->addText("y: on/off douwn sample", 10, 130, "v1 text7");
+  viewer2->addText("h: increase threshold douwn sample", 10, 120, "v1 text8");
+  viewer2->addText("n: reduce  threshold douwn sample", 10, 110, "v1 text9");
+  viewer2->addText("o: pausa la ejecucion del programa", 10, 100, "v1 text10");
+  viewer2->addText("l: ejecuta un ciclo del programa y se pausa", 10, 90, "v1 text11" );
   viewer->addPointCloud<PointType>(cloudAux, "sample cloud", v1);
   viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5);
   //para el lado der
