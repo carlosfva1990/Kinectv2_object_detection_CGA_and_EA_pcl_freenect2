@@ -68,43 +68,23 @@ include_directories(${PCL_INCLUDE_DIRS})
 
 find_package(OpenCV     REQUIRED)
 find_package(Freenect2  REQUIRED)
-find_package (VTK REQUIRED)
+
+#set(vsrlib "3rd_party/versor/vsr.lib")
 
 
+set(vsr_dir_include "3rd_party/versor/include/vsr")
+set(versor "3rd_party/versor/src")
+set(RANSAC_AGC "3rd_party/RANSAC_AGC")
 
-include_directories (
-		include
-        third_party/versor/include
-        third_party/versor/include/vsr
-        third_party/libfreenect2pclgrabber-master
-		${PCL_INCLUDE_DIRS}
-		${FREENECT2_INCLUDE_DIRS}
-		${OpenCV_INCLUDE_DIRS}
-)
-
-
-link_directories    (${PCL_LIBRARY_DIRS})
-add_definitions     (${PCL_DEFINITIONS})
-
-add_library(versor
-        third_party/versor/src/space/vsr_cga3D_op.cpp
-        third_party/versor/src/space/vsr_cga3D_frame.cpp
-        third_party/versor/src/space/vsr_cga3D_round.cpp
-        test.cpp
-		src/objects_body.cpp
-        src/ransac_body.cpp
-        #src/window/pclviewer.cpp
-	third_party/libfreenect2pclgrabber-master/k2g.cpp
-	)
+include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${FREENECT2_INCLUDE_DIRS})
+include_directories(${vsr_dir_include})
+include_directories(${versor} )
+include_directories(${RANSAC_AGC} )
+include_directories(${INCLUDE})
 
 
+add_executable(main      src/test.cpp)
 
-
-
-add_executable(Kinect2Grabber     
-		test.cpp
-		src/objects_body.cpp
-        src/ransac_body.cpp)
-
-target_link_libraries(Kinect2Grabber      ${OpenCV_LIBS} ${FREENECT2_LIBRARY} ${PCL_LIBRARIES} ${BOOST_LIBS} versor ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${FREENECT2_LIBRARY} ${OpenCV_LIBS} ${VTK_LIBRARIES})
+target_link_libraries(main      ${OpenCV_LIBS} ${FREENECT2_LIBRARY} ${PCL_LIBRARIES} ${BOOST_LIBS})
 
