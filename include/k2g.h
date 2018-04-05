@@ -44,6 +44,7 @@ via Luigi Alamanni 13D, San Giuliano Terme 56010 (PI), Italy
 #endif
 
 bool stop = false;
+int downSampRate = 4; //usa 2^n
 
 enum Processor{
 	CPU, OPENCL, OPENGL, CUDA
@@ -182,12 +183,19 @@ public:
 	}
 
 #ifdef WITH_PCL
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr getCloud(){
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr getCloud() {
 		const short w = undistorted_.width;
 		const short h = undistorted_.height;
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>(w, h));
-        
+
 		return updateCloud(cloud);
+	}
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr getCloudMed() {
+		const short w = undistorted_.width/ downSampRate;
+		const short h = undistorted_.height/ downSampRate;
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>(w, h));
+
+		return updateCloudMed(cloud);
 	}
 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr getCloud(const libfreenect2::Frame * rgb, const libfreenect2::Frame * depth, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud){
@@ -266,6 +274,79 @@ public:
 #endif
 		return cloud;
 	}
+
+
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr updateCloudMed(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud) {
+
+		listener_.waitForNewFrame(frames_);
+		libfreenect2::Frame * rgb = frames_[libfreenect2::Frame::Color];
+		libfreenect2::Frame * depth = frames_[libfreenect2::Frame::Depth];
+
+		registration_->apply(rgb, depth, &undistorted_, &registered_, true, &big_mat_, map_);
+		const std::size_t w = undistorted_.width;
+		const std::size_t h = undistorted_.height;
+
+		cv::Mat tmp_itD0(undistorted_.height, undistorted_.width, CV_8UC4, undistorted_.data);
+		cv::Mat tmp_itRGB0(registered_.height, registered_.width, CV_8UC4, registered_.data);
+
+		if (mirror_ == true) {
+
+			cv::flip(tmp_itD0, tmp_itD0, 1);
+			cv::flip(tmp_itRGB0, tmp_itRGB0, 1);
+
+		}
+
+		const float * itD0 = (float *)tmp_itD0.ptr();
+		const char * itRGB0 = (char *)tmp_itRGB0.ptr();
+
+		pcl::PointXYZRGB * itP = &cloud->points[0];
+		bool is_dense = true;
+
+		for (std::size_t y = 1; y < h; y+= downSampRate) {
+
+			const unsigned int offset = y * w;
+			const float * itD = itD0 + offset;
+			const char * itRGB = itRGB0 + offset * 4;
+			const float dy = rowmap(y);
+
+			for (std::size_t x = 1; x < w; x+= downSampRate, ++itP, itD+= downSampRate, itRGB += 4* downSampRate)
+			{
+				const float depth_value = *itD / 1000.0f;
+
+				if (!std::isnan(depth_value) && !(std::abs(depth_value) < 0.0001)) {
+
+					const float rx = colmap(x) * depth_value;
+					const float ry = dy * depth_value;
+					itP->z = depth_value;
+					itP->x = rx;
+					itP->y = ry;
+
+					itP->b = itRGB[0];
+					itP->g = itRGB[1];
+					itP->r = itRGB[2];
+				}
+				else {
+					itP->z = qnan_;
+					itP->x = qnan_;
+					itP->y = qnan_;
+
+					itP->b = qnan_;
+					itP->g = qnan_;
+					itP->r = qnan_;
+					is_dense = false;
+				}
+			}
+		}
+		cloud->is_dense = is_dense;
+		listener_.release(frames_);
+#ifdef WITH_SERIALIZATION
+		if (serialize_)
+			serializeCloud(cloud);
+#endif
+		return cloud;
+	}
+
+
 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr updateCloud(const libfreenect2::Frame * rgb, const libfreenect2::Frame * depth, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud){
 		
