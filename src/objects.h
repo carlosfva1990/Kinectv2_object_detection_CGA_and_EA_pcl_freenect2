@@ -29,7 +29,7 @@ public:
 		dualSphere = normalize(Round::dls(Vec(x, y, z), r));
 		radius = r;
 	}
-
+	
 	//Creates a sphere from 4 points in conformal space.
 	void defineDual(Pnt p1, Pnt p2, Pnt p3, Pnt p4) {
 		dualSphere = normalize((p1^p2^p3^p4).dual());
@@ -51,8 +51,10 @@ public:
 			^ Vec(cl->points[index[1]].x, cl->points[index[1]].y, cl->points[index[1]].z).null()
 			^ Vec(cl->points[index[2]].x, cl->points[index[2]].y, cl->points[index[2]].z).null()
 			^ Vec(cl->points[index[3]].x, cl->points[index[3]].y, cl->points[index[3]].z).null()).dual());
+
 		radius = calcRadius(dualSphere);
 		x = dualSphere[0]; y = dualSphere[1]; z = dualSphere[2];
+
 	}
 private:
 	//Function that calculates radius
@@ -88,7 +90,7 @@ public:
 	}
 
 	//Creates a plane from 3 indexed points in a point cloud
-	void defineDual(PointCloud<PointXYZRGB>::Ptr cl, int *index) {
+	void defineDual(PointCloud<PointXYZRGB>::Ptr cl, vector<int> index) {
 		dualPlane = (Vec(cl->points[index[0]].x, cl->points[index[0]].y, cl->points[index[0]].z).null()
 			^ Vec(cl->points[index[1]].x, cl->points[index[1]].y, cl->points[index[1]].z).null()
 			^ Vec(cl->points[index[2]].x, cl->points[index[2]].y, cl->points[index[2]].z).null()
@@ -131,7 +133,7 @@ public:
 	}
 
 	//Creates a circle from 3 point from a point cloud
-	void defineCircle(PointCloud<PointXYZRGB>::Ptr cl, int *index) {
+	void defineCircle(PointCloud<PointXYZRGB>::Ptr cl, vector<int> index) {
 		dualCircle = Vec(cl->points[index[0]].x, cl->points[index[0]].y, cl->points[index[0]].z).null()
 			^ Vec(cl->points[index[1]].x, cl->points[index[1]].y, cl->points[index[1]].z).null()
 			^ Vec(cl->points[index[2]].x, cl->points[index[2]].y, cl->points[index[2]].z).null();
@@ -184,18 +186,18 @@ public:
 	Pnt plan; //Store the IPNS representation of a plane
 	Pnt center; //Stores the center in a conformal vector
 	float radius = 0; //Float for storing the radius
+	sphere s1, s2;
 
 
 	//Creates a cylinder from two points in conformal space on the center axis and a radius
 	void defineCylinder(Pnt p1, Pnt p2, float rad) {
 		radius = rad;
 		center = p1;
-		for (int i = 0; i < 3; i++) {
-			plan[i] = (p1[i] - p2[i]) / sqrt(pow(p1[0] - p2[0], 2) + pow(p1[1] - p2[1], 2) + pow(p1[2] - p2[2], 2));
-		}
-		plan[3] = 0;
+		plan = p1 - p2;
+		s1.sphe = p1;
+		s2.sphe = p2;
 	}
-
+	/*
 	//Creates a cylinder from 3 points in conformal space
 	void defineCylinder(Pnt p1, Pnt p2, Pnt p3) {
 		plane pln;
@@ -206,9 +208,9 @@ public:
 		center = cir.circleCenter;
 		radius = cir.radius;
 	}
-
+	*/
 	//Creates the cylinder from 3 indexed points in a point cloud
-	void defineCylinder(PointCloud<PointXYZRGB>::Ptr cl, int *index) {
+	void defineCylinder(PointCloud<PointXYZRGB>::Ptr cl, vector<int> index) {
 		plane pln;
 		pln.defineDual(cl, index);
 		plan = pln.normDualPlane;

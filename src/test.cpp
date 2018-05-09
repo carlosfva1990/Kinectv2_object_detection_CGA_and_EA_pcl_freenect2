@@ -363,9 +363,10 @@ int main(int argc, char * argv[])
 				  model_c->setRadiusLimits(0.02, 1);
 				  pcl::RandomSampleConsensus<PointType> ransacC(model_c);
 
-
+				  
 				  ransacSphere sph;
 				  ransacPlane pln;
+				  ransacCylinder2 cyl;
 
 				  if (cloud_cluster->width > 20) //el cluster deve tener almenos 20 puntos
 				  {
@@ -404,7 +405,11 @@ int main(int argc, char * argv[])
 						  pln.compute();
 						  inliers = *pln.indexlist;
 						  probPlane = (double)inliers.size() / cloud_cluster->width;
-
+						  //se calcula ransac para el cilindro en agc
+						  cyl.setData(cloud_cluster, 0.001);
+						  cyl.compute();
+						  inliers = *cyl.indexlist;
+						  probCylinder = (double)inliers.size() / cloud_cluster->width;
 					  }
 
 
@@ -468,7 +473,7 @@ int main(int argc, char * argv[])
 							  coefficientsM.values[0] = coefficients[0];//x
 							  coefficientsM.values[1] = coefficients[1];//y
 							  coefficientsM.values[2] = coefficients[2];//z
-							  coefficientsM.values[3] = coefficients[3];//w
+							  coefficientsM.values[3] = coefficients[3];//w//d Hessian component
 							  //se crea un plano que correspunde al modelo calculado y se muestra
 							  viewer2->addPlane(coefficientsM, "plane" + std::to_string(j));
 						  }
@@ -514,7 +519,22 @@ int main(int argc, char * argv[])
 						  }
 						  else
 						  {
+							  inliers = *cyl.indexlist;
 
+							  //se obtienen los datos de la figura y se convirten en un tipo de dato para graficar
+							  pcl::ModelCoefficients coefficientsM;
+							  Eigen::VectorXf coefficients;
+							  coefficientsM.values.resize(7);
+							  ransacC.getModelCoefficients(coefficients);
+							  pcl::PointXYZ center;
+							  coefficientsM.values[0] = cyl.ranCyl.center[0];// centro x
+							  coefficientsM.values[1] = cyl.ranCyl.center[1];// centro y
+							  coefficientsM.values[2] = cyl.ranCyl.center[2];// centro z
+							  coefficientsM.values[3] = cyl.ranCyl.plan[0];// direccion del eje x
+							  coefficientsM.values[4] = cyl.ranCyl.plan[1];// direccion del eje y 
+							  coefficientsM.values[5] = cyl.ranCyl.plan[2];// direccion del eje z
+							  coefficientsM.values[6] = cyl.ranCyl.radius;// radio
+							  viewer2->addCylinder(coefficientsM, "cylinder" + std::to_string(j));
 						  }
 						  std::cout << "cylinder" + std::to_string(j) << std::endl;
 						  _cylinder = false;
