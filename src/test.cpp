@@ -406,7 +406,7 @@ int main(int argc, char * argv[])
 						  inliers = *pln.indexlist;
 						  probPlane = (double)inliers.size() / cloud_cluster->width;
 						  //se calcula ransac para el cilindro en agc
-						  cyl.setData(cloud_cluster, 0.001);
+						  cyl.setData(cloud_cluster, 0.01);
 						  cyl.compute();
 						  inliers = *cyl.indexlist;
 						  probCylinder = (double)inliers.size() / cloud_cluster->width;

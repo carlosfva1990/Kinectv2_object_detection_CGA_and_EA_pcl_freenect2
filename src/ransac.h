@@ -15,6 +15,7 @@
 #include <pcl/octree/octree_impl.h>
 #include <pcl/filters/extract_indices.h>
 
+#include <cmath>        // std::abs
 #include "objects.h"
 
 
@@ -137,8 +138,21 @@ public:
 				}
 			}
 
-			//Fit the sphere to its inliers
-			rad = sqrt(-2*ranSph[4]);
+			//cand[best].radius = sqrt(-2 * cand[best].dualSphere[4]);
+			ranSph = cand[best].dualSphere;
+
+
+
+			delete indexlist;
+			indexlist = new std::vector<int>;
+			for (int j = 0; j < cloud->points.size(); j++) {
+				if (isInlier(Vec(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z).null(), asphere)) {
+					indexlist->push_back(j);
+				}
+			}
+
+
+
 			//Check if the fit is succesfull, return the unfitted sphere.
 			/*if (cand[best].radius / rad > 1.1 || cand[best].radius / rad < 0.9) {
 				ranSph = cand[best].dualSphere;
@@ -317,12 +331,11 @@ public:
 	std::vector<int> *indexlist; //Vector for holding the index of inlier points
 	int candidates = 1;
 	int it=0;
-	int iterations = 300;
+	int iterations = 700;
 	int count;
 	std::vector<int> ran;
 	int can = 0;
 	int numInliers;
-
 
 						 //Setting the data and parameters of the algoritm
 	void setData(PointCloud<PointXYZRGB>::Ptr cl, float tolerance) {
@@ -349,30 +362,60 @@ public:
 		//Algorithm
 		while (it < iterations) {
 
+
+
+			
+
+			//Generate random indexesx
+			for (int i = 0; i<4; i++) {
+				ran[i] = rand() % cloud->points.size();
+
+			}
+
+			s1.defineDual(cloud, ran);
+			//s1.radius = s1.calcRadius(s1.dualSphere);
+			
+			//Generate random indexesx
+			for (int i = 0; i<4; i++) {
+				ran[i] = rand() % cloud->points.size();
+				
+			}
+			s2.defineDual(cloud, ran);
+			//s2.radius = s2.calcRadius(s2.dualSphere);
+			
+			
+
+
+
+			/*
 			//se calcula ransac para la esfera en agc
-			sph.setData(cloud, 0.001,300);
+			sph.setData(cloud, 0.001,50);
 			sph.compute();
 			s1.dualSphere = sph.ranSph;
+			s1.radius=s1.calcRadius(s1.dualSphere);
 			//se calcula ransac para la esfera en agc
-			sph.setData(cloud, 0.001,300);
+			sph.setData(cloud, 0.001,50);
 			sph.compute();
 			s2.dualSphere = sph.ranSph;
-
+			s2.radius=s2.calcRadius(s2.dualSphere);
+			*/
 
 			searchRadius = (s1.radius + s2.radius) / 2;
 
 			//Find number of inlier points for each candidate
 			count = 0;
 			for (int j = 0; j < cloud->points.size(); j++) {
-				if (isInlier2(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z,s1.dualSphere, s2.dualSphere)) {
+				if (isInlier2(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z,s1.dualSphere, s2.dualSphere, searchRadius)) {
 					count++;
 				}
 			}
 
-			ranCyl.defineCylinder(s1.dualSphere, s2.dualSphere, searchRadius);
+			ranCyl.defineCylinder(s1, s2, searchRadius);
 
 			if (inPoints[0] == NULL) {
+				cand[0] = ranCyl;
 				inPoints[0] = count;
+				can++;
 			}
 
 			if (count > inPoints[0]) {
@@ -400,10 +443,12 @@ public:
 
 			ranCyl = cand[best];
 
+
+
 			delete indexlist;
 			indexlist = new std::vector<int>;
 			for (int j = 0; j < cloud->points.size(); j++) {
-				if (isInlier2(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z, ranCyl.s1.dualSphere, ranCyl.s2.dualSphere)) {
+				if (isInlier2(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z, ranCyl.s1.dualSphere, ranCyl.s2.dualSphere, ranCyl.radius)) {
 					indexlist->push_back(j);
 				}
 			}
@@ -426,9 +471,15 @@ public:
 
 private:
 	//Function to check if a point is classified as a inlier
-	bool isInlier2(float x, float y, float z, Pnt sd1, Pnt sd2) {
+	bool isInlier2(float x, float y, float z, Pnt sd1, Pnt sd2, float radius) {
 		Pnt p1 = Vec(x, y, z).null();
 		Pnt ni = Vec().null();
+
+		float rMax, rMin;
+
+		rMax = radius + tol;
+		rMin = radius - tol;
+
 		ni[0] = 0;
 		ni[1] = 0;
 		ni[2] = 0;
@@ -437,8 +488,9 @@ private:
 		Par ppar = sd1 ^ sd2;
 		Lin L = ni ^ ppar  ;
 
-		Sca d = Sca(2)*(p1 <= ((p1 ^ L.dual()) / L.dual()));
-		if ( ( d[0] <  tol ) && ( d[0] > -1 * tol)) {
+		DualSphere s= ((p1 ^ L.dual())/L.dual());
+		Sca d = ( s <= s);
+		if ( ( abs(d[0]) > ( rMin)*(rMin)) && ( abs(d[0]) < (rMax)*(rMax))) {
 			return true;
 		}
 		else {

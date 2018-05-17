@@ -56,12 +56,12 @@ public:
 		x = dualSphere[0]; y = dualSphere[1]; z = dualSphere[2];
 
 	}
-private:
 	//Function that calculates radius
 	float calcRadius(Pnt sph) {
 		return sqrt((1 / pow(sph[3], 2))*(pow(sph[0], 2) + pow(sph[1], 2) + pow(sph[2], 2)) - (2 * sph[4] / sph[3]));
 	}
 
+private:
 	//Function that normalizes a conformal vector
 	Pnt normalize(Pnt dSph) {
 		Pnt ret;
@@ -190,12 +190,12 @@ public:
 
 
 	//Creates a cylinder from two points in conformal space on the center axis and a radius
-	void defineCylinder(Pnt p1, Pnt p2, float rad) {
+	void defineCylinder(sphere p1, sphere p2, float rad) {
 		radius = rad;
-		center = p1;
-		plan = p1 - p2;
-		s1.sphe = p1;
-		s2.sphe = p2;
+		center = Vec(p1.x,p1.y,p1.z).null();
+		plan = Vec(p1.x-p1.x, p1.y-p2.y, p1.z-p2.z).null();
+		s1 = p1;
+		s2 = p2;
 	}
 	/*
 	//Creates a cylinder from 3 points in conformal space
