@@ -395,13 +395,13 @@ int main(int argc, char * argv[])
 					  else
 					  {
 						  //se calcula ransac para la esfera en agc
-						  sph.setData(cloud_cluster, 0.001);
+						  sph.setData(cloud_cluster, 0.01);
 						  sph.compute();
 						  inliers = *sph.indexlist;
 						  probSphere = (double)inliers.size() / cloud_cluster->width;
 
 						  //se calcula ransac para el plano en agc
-						  pln.setData(cloud_cluster, 0.001, 1);
+						  pln.setData(cloud_cluster, 0.01, 1);
 						  pln.compute();
 						  inliers = *pln.indexlist;
 						  probPlane = (double)inliers.size() / cloud_cluster->width;
@@ -410,8 +410,8 @@ int main(int argc, char * argv[])
 						  cyl.compute();
 						  inliers = *cyl.indexlist;
 						  probCylinder = (double)inliers.size() / cloud_cluster->width;
-					  }
 
+					  }
 
 					  //se muestran las probabilidades para cada objeto
 					  std::cout << "sphere prob " << probSphere << std::endl;
