@@ -193,7 +193,7 @@ public:
 	void defineCylinder(sphere p1, sphere p2, float rad) {
 		radius = rad;
 		center = Vec(p1.x,p1.y,p1.z).null();
-		plan = Vec(p1.x-p1.x, p1.y-p2.y, p1.z-p2.z).null();
+		plan = Vec(p1.x-p2.x, p1.y-p2.y, p1.z-p2.z).null();
 		s1 = p1;
 		s2 = p2;
 	}

@@ -53,6 +53,10 @@ public:
     DualSphere ranSph; //Sphere object
 	sphere asphere; //Create a sphere object from object.h
 
+	sphere sph1;//para el calculo del cilindro
+	float distS1S2 = 0; //distancia entre los centros de s1 y s2
+	Pnt s1;
+
 
 					   //Setting the data and parameters of the algoritm
 	void setData(PointCloud<PointXYZRGB>::Ptr cl, float tol) {
@@ -68,6 +72,17 @@ public:
 		iterations = iter;
 		inlierTreshold = tol;
 		candidates = 1;
+	}
+	//Setting the data and parameters of the algoritm
+	void setData(PointCloud<PointXYZRGB>::Ptr cl, float tol, int iter, sphere sp, float dist) {
+		cloud = cl;
+		iterations = iter;
+		inlierTreshold = tol;
+		candidates = 1;
+		sph1 = sp;
+		s1 = Vec(sph1.x, sph1.y, sph1.z).null();
+		distS1S2 = dist;
+
 	}
 	/*
 	//Setting the data and parameters of the algoritm
@@ -95,7 +110,7 @@ public:
 
 		///vars for probability stop
 		double k = 3.0;
-		double probability_ = 0.9;//prob. to get a selection without error
+		double probability_ = 0.99;//prob. to get a selection without error
 		double log_probability = log(1.0 - probability_);
 		double one_over_indices = 1.0 / static_cast<double> (cloud->width);
 
@@ -126,13 +141,13 @@ public:
 				}
 				/*
 				if (inPoints[0] == NULL) {
-					inPoints[0] = count;
-					cand[0] = asphere;
+				inPoints[0] = count;
+				cand[0] = asphere;
 				}
 				*/
 				if (count > inPoints[0]) {
-					cand[0]=asphere;
-					inPoints[0]=count;
+					cand[0] = asphere;
+					inPoints[0] = count;
 					can++;
 
 					// Compute the k parameter (k=log(z)/log(1-w^n))
@@ -180,7 +195,125 @@ public:
 
 			//Check if the fit is succesfull, return the unfitted sphere.
 			/*if (cand[best].radius / rad > 1.1 || cand[best].radius / rad < 0.9) {
-				ranSph = cand[best].dualSphere;
+			ranSph = cand[best].dualSphere;
+			}*/
+			//Return true if a sphere was found
+			return true;
+		}
+		else {
+			//Return false if not
+			return false;
+		}
+	}
+
+	//Runs the primitive shape detection for a sphere2 of the cylinder
+	bool computeS2() {
+		//Variables to keep track of the algorithm
+		int it = 0;
+		vector<int> ran(4);
+		int can = 0;
+		vector<sphere> cand(candidates);
+		int count;
+		vector<int> inPoints(candidates);
+		Pnt s2;
+
+		//Timer
+		std::clock_t t1, t2;
+		t1 = std::clock();
+
+
+		///vars for probability stop
+		double k = 3.0;
+		double probability_ = 0.99;//prob. to get a selection without error
+		double log_probability = log(1.0 - probability_);
+		double one_over_indices = 1.0 / static_cast<double> (cloud->width);
+
+
+		inPoints[0] = 0;
+
+		//Algorithm
+		//while (it < iterations) {//can < candidates &&  it < iterations) {
+		while (it < k && it < iterations) {
+
+			//Generate random indexes
+			for (int i = 0; i<4; i++) {
+				ran[i] = rand() % cloud->points.size();
+			}
+
+			//Create dual sphere with indexed points from point cloud
+			asphere.defineDual(cloud, ran); //Creates a dual sphere in confromal space from 4 indexed points in a point cloud
+
+			s2 = Vec(asphere.x, asphere.y, asphere.z).null();
+
+			Sca d = Sca(-2)*(s1 <= s2);
+
+											//Check if sphere is inside tolerance
+			if (sphereCheck(asphere) && distS1S2 < sqrt ( abs ( d[0] ) ) ) {
+
+				//Count inliers
+				count = 0;
+				for (int j = 0; j < cloud->points.size(); j++) {
+					if (isInlier(Vec(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z).null(), asphere)) {
+						count++;
+					}
+				}
+				/*
+				if (inPoints[0] == NULL) {
+				inPoints[0] = count;
+				cand[0] = asphere;
+				}
+				*/
+				if (count > inPoints[0]) {
+					cand[0] = asphere;
+					inPoints[0] = count;
+					can++;
+
+					// Compute the k parameter (k=log(z)/log(1-w^n))
+					double w = static_cast<double> (inPoints[0]) * one_over_indices;
+					double p_no_outliers = 1.0 - pow(w, (ran.size()));// 4 puntos para crear la esfera
+					p_no_outliers = (std::max) (std::numeric_limits<double>::epsilon(), p_no_outliers);       // Avoid division by -Inf
+					p_no_outliers = (std::min) (1.0 - std::numeric_limits<double>::epsilon(), p_no_outliers);   // Avoid division by 0.
+					k = log_probability / log(p_no_outliers);
+
+
+				}
+			}
+			it++;
+
+
+
+		}
+
+		if (can > 0) {
+			//Find candidate with most inliers
+			int best = 0;
+			numInliers = 0;
+			for (int i = 0; i < cand.size(); i++) {
+				if (inPoints[i] > numInliers) {
+					best = i;
+					numInliers = inPoints[i];
+				}
+			}
+
+			//cand[best].radius = sqrt(-2 * cand[best].dualSphere[4]);
+			asphere = cand[best];
+			ranSph = cand[best].dualSphere;
+			rad = cand[best].calcRadius(cand[best].dualSphere);
+
+
+			delete indexlist;
+			indexlist = new std::vector<int>;
+			for (int j = 0; j < cloud->points.size(); j++) {
+				if (isInlier(Vec(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z).null(), asphere)) {
+					indexlist->push_back(j);
+				}
+			}
+
+
+
+			//Check if the fit is succesfull, return the unfitted sphere.
+			/*if (cand[best].radius / rad > 1.1 || cand[best].radius / rad < 0.9) {
+			ranSph = cand[best].dualSphere;
 			}*/
 			//Return true if a sphere was found
 			return true;
@@ -264,7 +397,7 @@ public:
 
 		///vars for probability stop
 		double k = 3.0;
-		double probability_ = 0.9;//prob. to get a selection without error
+		double probability_ = 0.99;//prob. to get a selection without error
 		double log_probability = log(1.0 - probability_);
 		double one_over_indices = 1.0 / static_cast<double> (cloud->width);
 
@@ -378,7 +511,7 @@ public:
 	std::vector<int> *indexlist; //Vector for holding the index of inlier points
 	int candidates = 1;
 	int it=0;
-	int iterations = 700;
+	int iterations = 5;
 	int count;
 	std::vector<int> ran;
 	int can = 0;
@@ -409,7 +542,7 @@ public:
 
 
 		///vars for probability stop
-		double k = 3.0;
+		double k = 300.0;
 		double probability_ = 0.9;//prob. to get a selection without error
 		double log_probability = log(1.0 - probability_);
 		double one_over_indices = 1.0 / static_cast<double> (cloud->width);
@@ -425,34 +558,13 @@ public:
 
 			
 			
-			//Generate random indexesx
-			for (int i = 0; i<4; i++) {
-				ran[i] = rand() % cloud->points.size();
-
-			}
-			/*
-			s1.defineDual(cloud, ran);
-			//s1.radius = s1.calcRadius(s1.dualSphere);
-			
-			//Generate random indexesx
-			for (int i = 0; i<4; i++) {
-				ran[i] = rand() % cloud->points.size();
-				
-			}
-			s2.defineDual(cloud, ran);
-			//s2.radius = s2.calcRadius(s2.dualSphere);
-			*/
-			
-
-
-			
 			
 			//se calcula ransac para la esfera en agc
-			sph.setData(cloud, 0.001,100);
+			sph.setData(cloud, 0.001);
 			sph.compute();
 			s1 = sph.asphere;
 			//se calcula ransac para la esfera en agc
-			sph.setData(cloud, 0.001,100);
+			sph.setData(cloud, 0.001);
 			sph.compute();
 			s2 = sph.asphere;
 			
@@ -483,7 +595,7 @@ public:
 
 				// Compute the k parameter (k=log(z)/log(1-w^n))
 				double w = static_cast<double> (inPoints[0]) * one_over_indices;
-				double p_no_outliers = 1.0 - pow(w, (8));// 4 puntos para crear la esfera
+				double p_no_outliers = 1.0 - pow(w, (8));// 4 puntos para crear la esfera 8 para el cilindro
 				p_no_outliers = (std::max) (std::numeric_limits<double>::epsilon(), p_no_outliers);       // Avoid division by -Inf
 				p_no_outliers = (std::min) (1.0 - std::numeric_limits<double>::epsilon(), p_no_outliers);   // Avoid division by 0.
 				k = log_probability / log(p_no_outliers);
