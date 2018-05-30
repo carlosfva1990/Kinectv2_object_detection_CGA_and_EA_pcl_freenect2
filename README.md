@@ -9,6 +9,7 @@ to filter and one las window showing the filered point cloud.
 the copy data is used to substract the points that are similar, and leaves what its diferent **`filter=cloud1-cloud2`**
 
 selecting the window with the kinect data we can:
+* using the `"a"` key switch between AGC and the vectorial method
 * using the `"p"` key makes a copy of the current data
 * using the `"s"` key save the point cloud to a ply file
 * using the `"o"` key pause the program
