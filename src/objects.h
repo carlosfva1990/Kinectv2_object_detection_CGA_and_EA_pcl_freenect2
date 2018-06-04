@@ -28,12 +28,14 @@ public:
 	void defineDual(float x, float y, float z, float r) {
 		dualSphere = normalize(Round::dls(Vec(x, y, z), r));
 		radius = r;
+		x = dualSphere[0]; y = dualSphere[1]; z = dualSphere[2];
 	}
 	
 	//Creates a sphere from 4 points in conformal space.
 	void defineDual(Pnt p1, Pnt p2, Pnt p3, Pnt p4) {
 		dualSphere = normalize((p1^p2^p3^p4).dual());
 		radius = calcRadius(dualSphere);
+		x = dualSphere[0]; y = dualSphere[1]; z = dualSphere[2];
 	}
 
 	//Creates a sphere from 4 points from a pointcloud.
@@ -43,6 +45,7 @@ public:
 			^ Vec(cl3->points[0].x, cl3->points[0].y, cl3->points[0].z).null()
 			^ Vec(cl4->points[0].x, cl4->points[0].y, cl4->points[0].z).null()).dual());
 		radius = calcRadius(dualSphere);
+		x = dualSphere[0]; y = dualSphere[1]; z = dualSphere[2];
 	}
 
 	//Creates a sphere in from 4 indexed points in a point cloud
@@ -58,7 +61,9 @@ public:
 	}
 	//Function that calculates radius
 	float calcRadius(Pnt sph) {
-		return sqrt((1 / pow(sph[3], 2))*(pow(sph[0], 2) + pow(sph[1], 2) + pow(sph[2], 2)) - (2 * sph[4] / sph[3]));
+		//return sqrt((1 / pow(sph[3], 2))*(pow(sph[0], 2) + pow(sph[1], 2) + pow(sph[2], 2)) - (2 * sph[4] / sph[3]));
+		Sca rad = Sca(2) * (Vec(sph[0], sph[1], sph[2]).null() <= sph);
+		return sqrt(rad[0]);
 	}
 
 private:

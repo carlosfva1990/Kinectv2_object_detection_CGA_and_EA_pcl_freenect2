@@ -36,6 +36,7 @@ via Luigi Alamanni 13D, San Giuliano Terme 56010 (PI), Italy
 #include <type_traits>
 #include "detail/vsr_multivector.h"
 #include "ransac.h"
+#include <time.h>
 
 typedef pcl::PointXYZRGB PointType;
 typedef pcl::Normal PointNType;
@@ -48,6 +49,7 @@ bool _cluster = false;
 bool _ciclo = true;
 bool _ciclo2 = false;
 bool _useAgc = true;
+bool _debug = true;
 
 boost::shared_ptr<pcl::PointCloud<PointType>> cloudKinect;
 pcl::PointCloud<PointType>::Ptr cloudAux(new pcl::PointCloud<PointType>);
@@ -213,6 +215,12 @@ int main(int argc, char * argv[])
 
 	//inicia el ciclo con los datos ya iniciados
 	while (!viewer->wasStopped()) {
+		
+		clock_t timeStart = clock();
+
+		//se envian los datos de los nuvos puntos y se muestran en la ventana
+		viewer->updatePointCloud(cloudOut, "sample cloud2");
+		viewer->updatePointCloud<PointType>(cloudAux, "sample cloud");
 
 		//permite la visualizacion de los datos 
 		viewer->spinOnce(2, true);
@@ -242,6 +250,10 @@ int main(int argc, char * argv[])
 			viewer->addText("h: increase threshold douwn sample", 10, 100, "v1 text8", v1);
 			viewer->addText("n: reduce  threshold douwn sample", 10, 90, "v1 text9", v1);
 
+			if (_debug) {
+				std::cout << "tiempo de actualizacion de los puntos:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+				timeStart = clock();
+			}
 			//se realiza una disminucion de puntos
 			if (_downSample)
 			{
@@ -256,6 +268,10 @@ int main(int argc, char * argv[])
 				copyPointCloud(*cloudAux, *cloudAux2);//el resultado se guarda en cloudAux2
 			}
 
+			if (_debug) {
+				std::cout << "tiempo disminucion de puntos:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+				timeStart = clock();
+			}
 			// para realizar la dferencia entre 2 nuves de puntos
 			//para eliminar los puntos que no se usan 
 			if (_resta)
@@ -272,6 +288,10 @@ int main(int argc, char * argv[])
 				copyPointCloud(*cloudAux2, *cloudOut);
 			}
 
+			if (_debug) {
+				std::cout << "tiempo dresta de las nubes:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+				timeStart = clock();
+			}
 
 			//clusterizacion de objetos usando la distancia euclidiana
 			if (_cluster && _resta)
@@ -316,6 +336,9 @@ int main(int argc, char * argv[])
 
 						std::vector<int> inliers;//indice de pintos que pertenecen a la figura
 
+						if (_debug) {
+							timeStart = clock();
+						}
 						//usando el metodo tradicional
 						if (!_useAgc)
 						{
@@ -331,6 +354,11 @@ int main(int argc, char * argv[])
 							ransacS.getInliers(inliers);
 							probSphere = (double)inliers.size() / cloud_cluster->width;
 
+							if (_debug) {
+								std::cout << "tiempo para estimar la esfera:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+								timeStart = clock();
+							}
+
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
 							/////////////////////////////////////////modelo del plano /////////////////////////////////////////////
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -341,6 +369,11 @@ int main(int argc, char * argv[])
 							ransacP.computeModel();
 							ransacP.getInliers(inliers);
 							probPlane = (double)inliers.size() / cloud_cluster->width;
+
+							if (_debug) {
+								std::cout << "tiempo para estimar el plano:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+								timeStart = clock();
+							}
 
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
 							//////////////////////////////////////////// cilindro /////////////////////////////////////////////////
@@ -363,6 +396,11 @@ int main(int argc, char * argv[])
 							ransacC.getInliers(inliers);
 							probCylinder = (double)inliers.size() / cloud_cluster->width;
 
+
+							if (_debug) {
+								std::cout << "tiempo para estimar el cilindo:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+								timeStart = clock();
+							}
 
 							/*
 							//se muestran las probabilidades para cada objeto
@@ -442,6 +480,10 @@ int main(int argc, char * argv[])
 						else
 						{
 
+							if (_debug) {
+								timeStart = clock();
+							}
+
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
 							////////////////////////////////////////modelo de la esfera ///////////////////////////////////////////
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -451,6 +493,11 @@ int main(int argc, char * argv[])
 							sph.compute();
 							inliers = *sph.indexlist;
 							probSphere = (double)inliers.size() / cloud_cluster->width;
+
+							if (_debug) {
+								std::cout << "tiempo para estimar la esfera:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+								timeStart = clock();
+							}
 
 
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -463,15 +510,25 @@ int main(int argc, char * argv[])
 							inliers = *pln.indexlist;
 							probPlane = (double)inliers.size() / cloud_cluster->width;
 
+							if (_debug) {
+								std::cout << "tiempo para estimar el plano:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+								timeStart = clock();
+							}
+
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
 							//////////////////////////////////////////// cilindro /////////////////////////////////////////////////
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
 							//se calcula ransac para el cilindro en agc
 							ransacCylinder2 cyl;
-							cyl.setData(cloud_cluster, 0.005);
+							cyl.setData(cloud_cluster, 0.0071);
 							cyl.compute();
 							inliers = *cyl.indexlist;
 							probCylinder = (double)inliers.size() / cloud_cluster->width;
+
+							if (_debug) {
+								std::cout << "tiempo para estimar el cilindro:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+								timeStart = clock();
+							}
 
 							/*
 							//se muestran las probabilidades para cada objeto
@@ -561,14 +618,17 @@ int main(int argc, char * argv[])
 							//se suma uno al contador de cluster
 							j++;
 							//  std::cout << "cluster" + std::to_string(j) << std::endl;
+
+							if (_debug) {
+								std::cout << "tiempo de renderizacion :  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+								timeStart = clock();
+							}
+
 						}
 					}
 				}
 			}
 
-				//se envian los datos de las nuves de puntos y mostrarlos en la ventana
-				viewer->updatePointCloud(cloudOut, "sample cloud2");
-				viewer->updatePointCloud<PointType>(cloudAux, "sample cloud");
 
 				 //si se usa la tecla de ciclo unico
 				if (_ciclo2)

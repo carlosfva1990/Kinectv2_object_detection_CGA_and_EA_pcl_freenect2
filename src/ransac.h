@@ -264,8 +264,8 @@ public:
 				}
 				*/
 				if (count > inPoints[0]) {
-					cand[0] = asphere;
-					inPoints[0] = count;
+					cand[can] = asphere;
+					inPoints[can] = count;
 					can++;
 
 					// Compute the k parameter (k=log(z)/log(1-w^n))
@@ -511,7 +511,7 @@ public:
 	std::vector<int> *indexlist; //Vector for holding the index of inlier points
 	int candidates = 1;
 	int it=0;
-	int iterations = 5;
+	int iterations = 10;
 	int count;
 	std::vector<int> ran;
 	int can = 0;
@@ -560,11 +560,11 @@ public:
 			
 			
 			//se calcula ransac para la esfera en agc
-			sph.setData(cloud, 0.001);
+			sph.setData(cloud, 0.005);
 			sph.compute();
 			s1 = sph.asphere;
 			//se calcula ransac para la esfera en agc
-			sph.setData(cloud, 0.001);
+			sph.setData(cloud, 0.005);
 			sph.compute();
 			s2 = sph.asphere;
 			
