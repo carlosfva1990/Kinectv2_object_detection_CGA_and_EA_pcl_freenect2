@@ -36,8 +36,11 @@ via Luigi Alamanni 13D, San Giuliano Terme 56010 (PI), Italy
 #include <type_traits>
 #include "detail/vsr_multivector.h"
 #include "ransac.h"
+#include <iostream>
+#include <fstream>
 #include <time.h>
 
+using namespace std;
 typedef pcl::PointXYZRGB PointType;
 typedef pcl::Normal PointNType;
 
@@ -213,10 +216,19 @@ int main(int argc, char * argv[])
 	//se acomoda la camara para ver los datos
 	viewer->setCameraPosition(1, 0, -4, 0, -1, 0, 0);
 
+
+	std::ofstream out;
+
+
 	//inicia el ciclo con los datos ya iniciados
 	while (!viewer->wasStopped()) {
-		
+
+		// std::ios::app is the open mode "append" meaning
+		// new data will be written to the end of the file.
+		out.open("myfile.txt", std::ios::app);
+
 		clock_t timeStart = clock();
+		clock_t timeLoop = clock();
 
 		//se envian los datos de los nuvos puntos y se muestran en la ventana
 		viewer->updatePointCloud(cloudOut, "sample cloud2");
@@ -388,7 +400,7 @@ int main(int argc, char * argv[])
 							pcl::SampleConsensusModelCylinder<PointType, PointNType >::Ptr model_c(new pcl::SampleConsensusModelCylinder<PointType, PointNType >(cloud_cluster));
 							model_c->setInputNormals(cloud_normals);
 							model_c->setInputCloud(cloud_cluster);
-							model_c->setRadiusLimits(0.02, 1);
+							//model_c->setRadiusLimits(0.02, 1);
 							pcl::RandomSampleConsensus<PointType> ransacC(model_c);
 							// se calcula RANSAC para el cilindro 
 							ransacC.setDistanceThreshold(.01);//tolerancia de error en la figura
@@ -410,11 +422,26 @@ int main(int argc, char * argv[])
 							*/
 							//se elige la mejor probabilidad
 							if (probSphere > probCylinder && probSphere > probPlane)
+							{
+								stringstream myString;
+								myString << "sphere,  prob: " << probSphere ;
+								out << myString.str();
 								_sphere = true;
+							}
 							if (probCylinder > probPlane && probCylinder > probSphere)
+							{
+								stringstream myString;
+								myString << "cylinder, prob: " << probCylinder ;
+								out << myString.str();
 								_cylinder = true;
+							}
 							if (probPlane > probCylinder && probPlane > probSphere)
+							{
+								stringstream myString;
+								myString << "plane,   prob: " << probPlane ;
+								out << myString.str();
 								_plane = true;
+							}
 
 							if (_sphere)
 							{
@@ -520,7 +547,7 @@ int main(int argc, char * argv[])
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
 							//se calcula ransac para el cilindro en agc
 							ransacCylinder2 cyl;
-							cyl.setData(cloud_cluster, 0.0071);
+							cyl.setData(cloud_cluster, 0.01);
 							cyl.compute();
 							inliers = *cyl.indexlist;
 							probCylinder = (double)inliers.size() / cloud_cluster->width;
@@ -538,11 +565,26 @@ int main(int argc, char * argv[])
 							*/
 							//se elige la mejor probabilidad
 							if (probSphere > probCylinder && probSphere > probPlane)
+							{
+								stringstream myString;
+								myString << "sphere,  prob: " << probSphere;
+								out << myString.str();
 								_sphere = true;
+							}
 							if (probCylinder > probPlane && probCylinder > probSphere)
+							{
+								stringstream myString;
+								myString << "cylinder, prob: " << probCylinder;
+								out << myString.str();
 								_cylinder = true;
+							}
 							if (probPlane > probCylinder && probPlane > probSphere)
+							{
+								stringstream myString;
+								myString << "plane,   prob: " << probPlane;
+								out << myString.str();
 								_plane = true;
+							}
 
 							if (_sphere) {
 								//inliers = *sph.indexlist;
@@ -587,9 +629,9 @@ int main(int argc, char * argv[])
 								coefficientsM.values[0] = cyl.ranCyl.center[0];// centro x
 								coefficientsM.values[1] = cyl.ranCyl.center[1];// centro y
 								coefficientsM.values[2] = cyl.ranCyl.center[2];// centro z
-								coefficientsM.values[3] = cyl.ranCyl.plan[0];// direccion del eje x
-								coefficientsM.values[4] = cyl.ranCyl.plan[1];// direccion del eje y 
-								coefficientsM.values[5] = cyl.ranCyl.plan[2];// direccion del eje z
+								coefficientsM.values[3] = cyl.ranCyl.plan[0]*2;// direccion del eje x
+								coefficientsM.values[4] = cyl.ranCyl.plan[1]*2;// direccion del eje y 
+								coefficientsM.values[5] = cyl.ranCyl.plan[2]*2;// direccion del eje z
 								coefficientsM.values[6] = cyl.ranCyl.radius;// radio
 								viewer->addCylinder(coefficientsM, "cylinder" + std::to_string(j), 0);
 
@@ -620,12 +662,17 @@ int main(int argc, char * argv[])
 							//  std::cout << "cluster" + std::to_string(j) << std::endl;
 
 							if (_debug) {
+
 								std::cout << "tiempo de renderizacion :  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
 								timeStart = clock();
 							}
 
 						}
 					}
+
+					stringstream myString;
+					myString << ",  Time: " << (double)(clock() - timeLoop) / CLOCKS_PER_SEC << std::endl;
+					out << myString.str();
 				}
 			}
 
@@ -633,7 +680,8 @@ int main(int argc, char * argv[])
 				 //si se usa la tecla de ciclo unico
 				if (_ciclo2)
 					_ciclo = false;
-			
+
+				out.close();
 		}
 	}
 
