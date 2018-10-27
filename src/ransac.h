@@ -501,7 +501,7 @@ public:
 	ransacCylinder2() {
 			indexlist = new std::vector<int>;
 	}
-    PointCloud<PointXYZRGB>::Ptr cloud; //Point cloud for storing the data set
+	PointCloud<PointXYZRGB>::Ptr cloud; //Point cloud for storing the data 
     PointCloud<PointXYZRGB>::Ptr inlierCloud; //Point cloud for storing the inliers
     float tol = 0; //Float for the radius tolerance
     float searchRadius = 0; //Float for storing the radius
@@ -511,7 +511,7 @@ public:
 	std::vector<int> *indexlist; //Vector for holding the index of inlier points
 	int candidates = 1;
 	int it=0;
-	int iterations = 10;
+	int iterations = 3;
 	int count;
 	std::vector<int> ran;
 	int can = 0;
@@ -548,6 +548,12 @@ public:
 		double one_over_indices = 1.0 / static_cast<double> (cloud->width);
 
 
+		Pnt ni = Vec().null();
+		ni[0] = 0;
+		ni[1] = 0;
+		ni[2] = 0;
+		ni[3] = 0;
+		ni[4] = 1;
 
 		inPoints[0] = 0;
 		//Algorithm
@@ -560,46 +566,53 @@ public:
 			
 			
 			//se calcula ransac para la esfera en agc
-			sph.setData(cloud, 0.005);
+			sph.setData(cloud, 0.001);
 			sph.compute();
-			s1 = sph.asphere;
+			s1 = sph.asphere; 
+			
 			//se calcula ransac para la esfera en agc
-			sph.setData(cloud, 0.005);
+			sph.setData(cloud, 0.001);
 			sph.compute();
 			s2 = sph.asphere;
 			
 
 			searchRadius = (s1.radius + s2.radius) / 2;
+			
+			Par ppar = s1.dualSphere ^ s2.dualSphere;
+			Lin L1 =  ppar ^ ni;
 
 			//Find number of inlier points for each candidate
 			count = 0;
-			for (int j = 0; j < cloud->points.size(); j++) {
-				if (isInlier2(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z,s1.dualSphere, s2.dualSphere, searchRadius)) {
-					count++;
+			if (searchRadius < 1.0) {
+				for (int j = 0; j < cloud->points.size(); j++) {
+					if (isInlier2(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z, L1, searchRadius)) {
+						count++;
+					}
 				}
-			}
 
-			ranCyl.defineCylinder(s1, s2, searchRadius);
-			/*
-			if (inPoints[0] == NULL) {
-				cand[0] = ranCyl;
-				inPoints[0] = count;
-				can++;
 			}
-			*/
-			if (count > inPoints[0]) {
-				cand[0] = ranCyl;
-				inPoints[0] = count;
-				can++;
+				/*
+				if (inPoints[0] == NULL) {
+					cand[0] = ranCyl;
+					inPoints[0] = count;
+					can++;
+				}
+				*/
+				if (count > inPoints[0]) {
+					cand[0].defineCylinder(s1, s2, searchRadius);
+					inPoints[0] = count;
+					can++;
+		
 
-
-				// Compute the k parameter (k=log(z)/log(1-w^n))
-				double w = static_cast<double> (inPoints[0]) * one_over_indices;
-				double p_no_outliers = 1.0 - pow(w, (8));// 4 puntos para crear la esfera 8 para el cilindro
-				p_no_outliers = (std::max) (std::numeric_limits<double>::epsilon(), p_no_outliers);       // Avoid division by -Inf
-				p_no_outliers = (std::min) (1.0 - std::numeric_limits<double>::epsilon(), p_no_outliers);   // Avoid division by 0.
-				k = log_probability / log(p_no_outliers);
-			}
+					// Compute the k parameter (k=log(z)/log(1-w^n))
+					double w = static_cast<double> (inPoints[0]) * one_over_indices;
+					double p_no_outliers = 1.0 - pow(w, (8));// 4 puntos para crear la esfera 8 para el cilindro
+					p_no_outliers = (std::max) (std::numeric_limits<double>::epsilon(), p_no_outliers);       // Avoid division by -Inf
+					p_no_outliers = (std::min) (1.0 - std::numeric_limits<double>::epsilon(), p_no_outliers);   // Avoid division by 0.
+					k = log_probability / log(p_no_outliers);
+			
+		
+				}
 
 			it++;
 		}
@@ -607,7 +620,7 @@ public:
 
 
 
-		if (can > 0) {
+		if (can > 0 ) {
 			//Find candidate with most inliers
 			int best = 0;
 			numInliers = 0;
@@ -622,14 +635,16 @@ public:
 
 
 
+			Lin L1 = ranCyl.s1.dualSphere  ^ ranCyl.s2.dualSphere ^ ni;
 			delete indexlist;
 			indexlist = new std::vector<int>;
-			for (int j = 0; j < cloud->points.size(); j++) {
-				if (isInlier2(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z, ranCyl.s1.dualSphere, ranCyl.s2.dualSphere, ranCyl.radius)) {
-					indexlist->push_back(j);
+			if (ranCyl.radius < 1) {
+				for (int j = 0; j < cloud->points.size(); j++) {
+					if (isInlier2(cloud->points[j].x, cloud->points[j].y, cloud->points[j].z, L1, ranCyl.radius)) {
+						indexlist->push_back(j);
+					}
 				}
 			}
-
 
 
 			return true;
@@ -648,26 +663,17 @@ public:
 
 private:
 	//Function to check if a point is classified as a inlier
-	bool isInlier2(float x, float y, float z, Pnt sd1, Pnt sd2, float radius) {
+	bool isInlier2(float x, float y, float z, Lin L, float radius) {
 		Pnt p1 = Vec(x, y, z).null();
-		Pnt ni = Vec().null();
-
 		float rMax, rMin;
 
 		rMax = radius + tol;
 		rMin = radius - tol;
 
-		ni[0] = 0;
-		ni[1] = 0;
-		ni[2] = 0;
-		ni[3] = 0;
-		ni[4] = 1;
-		Par ppar = sd1 ^ sd2;
-		Lin L = ni ^ ppar  ;
 
 		DualSphere s= ((p1 ^ L.dual())/L.dual());
 		Sca d = ( s <= s);
-		if ( ( abs(d[0]) > ( rMin)*(rMin)) && ( abs(d[0]) < (rMax)*(rMax))) {
+		if ( (sqrt( abs(d[0])) > (rMin)) && (sqrt(abs(d[0])) < (rMax))) {
 			return true;
 		}
 		else {

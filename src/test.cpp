@@ -44,7 +44,7 @@ using namespace std;
 typedef pcl::PointXYZRGB PointType;
 typedef pcl::Normal PointNType;
 
-double tress = 0.01;
+double tress = 0.001;
 double down = 0.025;
 bool _downSample = true;
 bool _resta = true;
@@ -98,7 +98,7 @@ void KeyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
 			pcl::copyPointCloud(*cloudAux2, *cloudCopy);
 			tree->setInputCloud(cloudOut);
 			_cluster = true;
-			_downSample = false;
+			//_downSample = false;
 			std::cout << "cpiado" << std::endl;
 		}
 		if (pressed == "s")
@@ -181,7 +181,7 @@ int main(int argc, char * argv[])
 {
 
 	//se define e inicia la captura de datos de kinect usando freenect y k2g
-	Processor freenectprocessor = CUDA;//si no tienes cuda instalado prueba con OPENGL o CPU
+	Processor freenectprocessor =OPENGL;//si no tienes CUDA instalado prueba con CPU, OPENCL o OPENGL
 	std::vector<int> ply_file_indices;
 	K2G k2g(freenectprocessor);
 	k2g.disableLog();
@@ -219,12 +219,20 @@ int main(int argc, char * argv[])
 
 	std::ofstream out;
 
+	// std::ios::app is the open mode "append" meaning
+	// new data will be written to the end of the file.
+	out.open("myfile.txt", std::ios::app);
+
+	stringstream myString;
+	myString << std::endl << "getData\t downsample\t resta\t clusteer\t esfera\t plano\t cilindro\t veredicto\t probabilidad\t Render\t metodo\t tiempototal" << std::endl;
+	out << myString.str();
+
+	out.close();
 
 	//inicia el ciclo con los datos ya iniciados
 	while (!viewer->wasStopped()) {
 
-		// std::ios::app is the open mode "append" meaning
-		// new data will be written to the end of the file.
+
 		out.open("myfile.txt", std::ios::app);
 
 		clock_t timeStart = clock();
@@ -232,10 +240,10 @@ int main(int argc, char * argv[])
 
 		//se envian los datos de los nuvos puntos y se muestran en la ventana
 		viewer->updatePointCloud(cloudOut, "sample cloud2");
-		viewer->updatePointCloud<PointType>(cloudAux, "sample cloud");
+		viewer->updatePointCloud(cloudAux, "sample cloud");
 
 		//permite la visualizacion de los datos 
-		viewer->spinOnce(2, true);
+		viewer->spinOnce(100, true);
 
 		//pausa la ejecucion
 		if (_ciclo)
@@ -264,6 +272,11 @@ int main(int argc, char * argv[])
 
 			if (_debug) {
 				std::cout << "tiempo de actualizacion de los puntos:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+				stringstream myString;
+				myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+				out << myString.str();
+
 				timeStart = clock();
 			}
 			//se realiza una disminucion de puntos
@@ -274,6 +287,7 @@ int main(int argc, char * argv[])
 				vg.setInputCloud(cloudAux);
 				vg.setLeafSize(down, down, down);
 				vg.filter(*cloudAux2);//el resultado se guarda en cloudAux2
+
 			}
 			else
 			{
@@ -282,6 +296,11 @@ int main(int argc, char * argv[])
 
 			if (_debug) {
 				std::cout << "tiempo disminucion de puntos:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+				stringstream myString;
+				myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+				out << myString.str();
+
 				timeStart = clock();
 			}
 			// para realizar la dferencia entre 2 nuves de puntos
@@ -301,7 +320,12 @@ int main(int argc, char * argv[])
 			}
 
 			if (_debug) {
-				std::cout << "tiempo dresta de las nubes:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+				std::cout << "tiempo de resta de las nubes:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+				stringstream myString;
+				myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+				out << myString.str();
+
 				timeStart = clock();
 			}
 
@@ -338,6 +362,7 @@ int main(int argc, char * argv[])
 					//se calcula el mejor modelo para cada cluster
 					if (cloud_cluster->width > 20) //el cluster deve tener almenos 20 puntos
 					{
+						
 						double probSphere = 0;
 						double probPlane = 0;
 						double probCylinder = 0;
@@ -348,7 +373,14 @@ int main(int argc, char * argv[])
 
 						std::vector<int> inliers;//indice de pintos que pertenecen a la figura
 
+
 						if (_debug) {
+							std::cout << "tiempo de cluster:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+							stringstream myString;
+							myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+							out << myString.str();
+
 							timeStart = clock();
 						}
 						//usando el metodo tradicional
@@ -368,6 +400,11 @@ int main(int argc, char * argv[])
 
 							if (_debug) {
 								std::cout << "tiempo para estimar la esfera:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+								stringstream myString;
+								myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+								out << myString.str();
+
 								timeStart = clock();
 							}
 
@@ -384,6 +421,11 @@ int main(int argc, char * argv[])
 
 							if (_debug) {
 								std::cout << "tiempo para estimar el plano:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+								stringstream myString;
+								myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+								out << myString.str();
+
 								timeStart = clock();
 							}
 
@@ -400,7 +442,7 @@ int main(int argc, char * argv[])
 							pcl::SampleConsensusModelCylinder<PointType, PointNType >::Ptr model_c(new pcl::SampleConsensusModelCylinder<PointType, PointNType >(cloud_cluster));
 							model_c->setInputNormals(cloud_normals);
 							model_c->setInputCloud(cloud_cluster);
-							//model_c->setRadiusLimits(0.02, 1);
+							model_c->setRadiusLimits(0.02, 0.8);
 							pcl::RandomSampleConsensus<PointType> ransacC(model_c);
 							// se calcula RANSAC para el cilindro 
 							ransacC.setDistanceThreshold(.01);//tolerancia de error en la figura
@@ -411,6 +453,11 @@ int main(int argc, char * argv[])
 
 							if (_debug) {
 								std::cout << "tiempo para estimar el cilindo:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+								stringstream myString;
+								myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+								out << myString.str();
+
 								timeStart = clock();
 							}
 
@@ -424,21 +471,21 @@ int main(int argc, char * argv[])
 							if (probSphere > probCylinder && probSphere > probPlane)
 							{
 								stringstream myString;
-								myString << "sphere,  prob: " << probSphere ;
+								myString << "sphere, \t" << probSphere <<"\t";
 								out << myString.str();
 								_sphere = true;
 							}
-							if (probCylinder > probPlane && probCylinder > probSphere)
+							if (probCylinder > probPlane && probCylinder >= probSphere)
 							{
 								stringstream myString;
-								myString << "cylinder, prob: " << probCylinder ;
+								myString << "cylinder, \t" << probCylinder <<"\t";
 								out << myString.str();
 								_cylinder = true;
 							}
-							if (probPlane > probCylinder && probPlane > probSphere)
+							if (probPlane >= probCylinder && probPlane >= probSphere)
 							{
 								stringstream myString;
-								myString << "plane,   prob: " << probPlane ;
+								myString << "plane,  \t" << probPlane << "\t";
 								out << myString.str();
 								_plane = true;
 							}
@@ -501,14 +548,24 @@ int main(int argc, char * argv[])
 								std::cout << "cylinder" + std::to_string(j) << std::endl;
 								_cylinder = false;
 							}
+						
+							if (_debug) {
 
+								std::cout << "tiempo de renderizacion :  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+								stringstream myString;
+								myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t" << _useAgc;
+								out << myString.str();
+
+								timeStart = clock();
+							}
 						}
 						//usando algebra geometrica
 						else
 						{
 
 							if (_debug) {
-								timeStart = clock();
+								//timeStart = clock();
 							}
 
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -516,13 +573,18 @@ int main(int argc, char * argv[])
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
 							//se calcula ransac para la esfera en agc
 							ransacSphere sph;
-							sph.setData(cloud_cluster, 0.001);
+							sph.setData(cloud_cluster, 00.001); 
 							sph.compute();
 							inliers = *sph.indexlist;
 							probSphere = (double)inliers.size() / cloud_cluster->width;
 
 							if (_debug) {
 								std::cout << "tiempo para estimar la esfera:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+								stringstream myString;
+								myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+								out << myString.str();
+
 								timeStart = clock();
 							}
 
@@ -532,13 +594,18 @@ int main(int argc, char * argv[])
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
 							//se calcula ransac para el plano en agc
 							ransacPlane pln;
-							pln.setData(cloud_cluster, 0.003, 1);
+							pln.setData(cloud_cluster, 0.01, 1);
 							pln.compute();
 							inliers = *pln.indexlist;
 							probPlane = (double)inliers.size() / cloud_cluster->width;
 
 							if (_debug) {
 								std::cout << "tiempo para estimar el plano:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+								stringstream myString;
+								myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+								out << myString.str();
+
 								timeStart = clock();
 							}
 
@@ -547,41 +614,46 @@ int main(int argc, char * argv[])
 							///////////////////////////////////////////////////////////////////////////////////////////////////////
 							//se calcula ransac para el cilindro en agc
 							ransacCylinder2 cyl;
-							cyl.setData(cloud_cluster, 0.01);
+							cyl.setData(cloud_cluster, 0.02);
 							cyl.compute();
 							inliers = *cyl.indexlist;
 							probCylinder = (double)inliers.size() / cloud_cluster->width;
 
 							if (_debug) {
 								std::cout << "tiempo para estimar el cilindro:  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+								stringstream myString;
+								myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t";
+								out << myString.str();
+
 								timeStart = clock();
 							}
 
-							/*
+							
 							//se muestran las probabilidades para cada objeto
-							std::cout << "sphere prob " << probSphere << std::endl;
-							std::cout << "plane prob " << probPlane << std::endl;
-							std::cout << "cylinder prob " << probCylinder << std::endl;
-							*/
+							std::cout << "sphere prob \t" << probSphere << std::endl;
+							std::cout << "plane prob \t" << probPlane << std::endl;
+							std::cout << "cylinder prob \t" << probCylinder << std::endl;
+							
 							//se elige la mejor probabilidad
 							if (probSphere > probCylinder && probSphere > probPlane)
 							{
 								stringstream myString;
-								myString << "sphere,  prob: " << probSphere;
+								myString << "sphere\t" << probSphere <<"\t";
 								out << myString.str();
 								_sphere = true;
 							}
-							if (probCylinder > probPlane && probCylinder > probSphere)
+							if (probCylinder > probPlane && probCylinder >= probSphere)
 							{
 								stringstream myString;
-								myString << "cylinder, prob: " << probCylinder;
+								myString << "cylinder\t" << probCylinder << "\t";
 								out << myString.str();
 								_cylinder = true;
 							}
-							if (probPlane > probCylinder && probPlane > probSphere)
+							if (probPlane >= probCylinder && probPlane >= probSphere)
 							{
 								stringstream myString;
-								myString << "plane,   prob: " << probPlane;
+								myString << "plane\t" << probPlane << "\t";
 								out << myString.str();
 								_plane = true;
 							}
@@ -664,18 +736,28 @@ int main(int argc, char * argv[])
 							if (_debug) {
 
 								std::cout << "tiempo de renderizacion :  " << (double)(clock() - timeStart) / CLOCKS_PER_SEC << std::endl;
+
+								stringstream myString;
+								myString << (double)(clock() - timeStart) / CLOCKS_PER_SEC << "\t"<< _useAgc;
+								out << myString.str();
+
 								timeStart = clock();
 							}
 
 						}
 					}
-
-					stringstream myString;
-					myString << ",  Time: " << (double)(clock() - timeLoop) / CLOCKS_PER_SEC << std::endl;
-					out << myString.str();
 				}
 			}
+			else {
 
+				
+					stringstream myString;
+				myString << ", \t, \t, \t, \t, \t, \t, \t"  ;
+				out << myString.str();
+			}
+			stringstream myString;
+			myString << ", \t" << (double)(clock() - timeLoop) / CLOCKS_PER_SEC << std::endl;
+			out << myString.str();
 
 				 //si se usa la tecla de ciclo unico
 				if (_ciclo2)

@@ -190,7 +190,7 @@ class cylinder{
 public:
 	Pnt plan; //Store the IPNS representation of a plane
 	Pnt center; //Stores the center in a conformal vector
-	float radius = 0; //Float for storing the radius
+	float radius = 11000; //Float for storing the radius
 	sphere s1, s2;
 
 
