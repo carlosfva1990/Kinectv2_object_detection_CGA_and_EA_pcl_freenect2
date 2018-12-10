@@ -53,6 +53,8 @@ the software i used:
 * [OpenNI2](https://github.com/OpenNI/OpenNI2)  (or 
 			https://s3.amazonaws.com/com.occipital.openni/OpenNI-Windows-x64-2.2.0.33.zip) 
 
+and used the proyect  [libfreenect2pclgrabber](https://github.com/OpenKinect/libfreenect2)  (in /third_party folder)
+
 
 when i build **libfreenect2** i needed to copy `"config.h"` and `"export.h"` from **`/build_dir/libfreenect2/`** to **`/include/libfreenect2/`**
 and i copy the dll files to **`c:/windows/system32/`** to avoid copying the files in every project folder.
