@@ -1,6 +1,6 @@
-# Kinectv2_pcl_freenect2_SegmentDifferences #
+# Kinectv2_object_detection_CGA_and_EA_pcl_freenect2 #
 
-this is an example project where using the sensor kinect v2 the point cloud is represented using  pcl 1.8,
+this is a project using the sensor kinect v2 where the point cloud is estimated to a simple geometric object, using pcl 1.8,
 and for grabbing the data is a libfreenect2 grabber.
 
 in this program display four windows, one is the comand line output, one the kinect data as Point cloud, other thar is the copy data
